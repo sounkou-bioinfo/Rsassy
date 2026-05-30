@@ -10,6 +10,8 @@
 ^_pkgdown\.yml$
 ^docs$
 ^LICENSE$
+^LICENCE$
+^LICENCE\.md$
 ^README\.Rmd$
 ^Makefile$
 ^Dockerfile.*$
