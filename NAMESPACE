@@ -2,6 +2,8 @@
 
 S3method(print,sassy_features)
 S3method(print,sassy_matches)
+export(sassy_as_sam)
+export(sassy_crispr)
 export(sassy_features)
 export(sassy_search)
 export(sassy_search_connection)

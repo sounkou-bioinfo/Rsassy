@@ -67,11 +67,12 @@ region_matches
 ```
 
 The print method can color `match_region` with simple ANSI escape
-sequences, following the CLI `sassy grep` alignment legend: green for
-matching characters, orange for mismatches, blue for inserted text
-characters, and red gaps for pattern characters absent from the text.
-Coloring is off by default and is meant for ANSI-capable interactive
-terminals.
+sequences, following the upstream
+[Sassy](https://github.com/RagnarGrootKoerkamp/sassy) CLI `sassy grep`
+alignment legend: green for matching characters, orange for mismatches,
+blue for inserted text characters, and red gaps for pattern characters
+absent from the text. Coloring is off by default and is meant for
+ANSI-capable interactive terminals.
 
 Reuse a searcher when making repeated calls:
 
@@ -105,9 +106,44 @@ sassy_search(
 
 `mode = "encoded_patterns"` (alias `"v2"`) is the R equivalent of CLI
 `--v2` for many equal-length short patterns. `batch_patterns` and
-`encoded_patterns` use Sassy’s multi-pattern encoding, which in `sassy`
-0.2.1 is implemented for IUPAC and equal byte-length patterns. Use
-`single` for other alphabets or mixed pattern lengths.
+`encoded_patterns` use
+[Sassy](https://github.com/RagnarGrootKoerkamp/sassy)’s multi-pattern
+encoding, which in `sassy` 0.2.1 is implemented for IUPAC and equal
+byte-length patterns. Use `single` for other alphabets or mixed pattern
+lengths.
+
+CLI-compatible orientation is available with `sam = TRUE`. This formats
+reverse-strand `match_region` and `cigar` in text direction, matching
+upstream [Sassy](https://github.com/RagnarGrootKoerkamp/sassy)
+`sassy --sam` output.
+
+``` r
+sassy_search(
+  "ACGA",
+  "TTTCGTTT",
+  k = 0,
+  alphabet = "dna",
+  match_region = TRUE,
+  sam = TRUE
+)
+#> <sassy_matches> 1 match
+#> pattern_idx text_idx text_start text_end pattern_start pattern_end cost strand cigar match_region
+#>           0        0          2        6             0           4    0      -    4=         TCGT
+```
+
+CRISPR guide search is available for in-memory sequences with
+`sassy_crispr()`. Guides include the PAM suffix; by default the PAM must
+match exactly under IUPAC matching.
+
+``` r
+sassy_crispr("ACGTNGG", c(chr1 = "TTTACGTAGGTTT"), k = 0, rc = FALSE)
+#>     guide text_id cost strand start end match_region cigar
+#> 1 ACGTNGG    chr1    0      +     3  10      ACGTAGG    7=
+```
+
+For file-oriented colored `grep`, FASTA/FASTQ filtering, and large
+command-line pipelines, use the upstream
+[Sassy](https://github.com/RagnarGrootKoerkamp/sassy) CLI directly.
 
 Connections can be searched without an R-level read loop and return the
 same match columns with stream-relative coordinates:

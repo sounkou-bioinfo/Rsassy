@@ -23,6 +23,17 @@ expect_true("match_region" %in% names(region_matches))
 expect_equal(region_matches$match_region, c("ATCGATCG", "AACGATCG", "ATCGATCC"))
 expect_true(!("match_region" %in% names(sassy_search("ATCG", "ATCG", 0, alphabet = "dna"))))
 
+rc_region <- sassy_search("ACGA", "TTTCGTTT", 0, alphabet = "dna", match_region = TRUE)
+rc_row <- rc_region[rc_region$strand == "-", , drop = FALSE]
+expect_equal(nrow(rc_row), 1L)
+expect_equal(rc_row$match_region, "ACGA")
+rc_sam <- sassy_search("ACGA", "TTTCGTTT", 0, alphabet = "dna", match_region = TRUE, sam = TRUE)
+rc_sam_row <- rc_sam[rc_sam$strand == "-", , drop = FALSE]
+expect_equal(rc_sam_row$match_region, "TCGT")
+toy_sam <- sassy_as_sam(data.frame(strand = "-", cigar = "2=1X3D", match_region = "AAGT"), alphabet = "dna")
+expect_equal(toy_sam$cigar, "3D1X2=")
+expect_equal(toy_sam$match_region, "ACTT")
+
 print_output <- capture.output(print(region_matches, color = FALSE))
 expect_true(grepl("<sassy_matches> 3 matches", print_output[1], fixed = TRUE))
 expect_true(any(grepl("match_region", print_output, fixed = TRUE)))
@@ -85,6 +96,16 @@ expect_equal(batch_pattern_matches$pattern_idx, c(0L, 1L))
 expect_equal(batch_pattern_matches$text_idx, c(0L, 0L))
 expect_equal(batch_pattern_matches$text_start, c(4, 11))
 expect_equal(batch_pattern_matches$cigar, c("3=", "3="))
+
+crispr_matches <- sassy_crispr("ACGTNGG", c(chr1 = "TTTACGTAGGTTT", chr2 = "TTTACGTAAATTT"), 2, rc = FALSE)
+expect_equal(names(crispr_matches), c("guide", "text_id", "cost", "strand", "start", "end", "match_region", "cigar"))
+expect_equal(nrow(crispr_matches), 1L)
+expect_equal(crispr_matches$guide, "ACGTNGG")
+expect_equal(crispr_matches$text_id, "chr1")
+expect_equal(crispr_matches$match_region, "ACGTAGG")
+crispr_pam_edits <- sassy_crispr("ACGTNGG", "TTTACGTAAATTT", 2, rc = FALSE, allow_pam_edits = TRUE)
+expect_true(any(crispr_pam_edits$match_region == "ACGTAAA"))
+expect_error(sassy_crispr(c("ACGTNGG", "ACGTNGA"), "TTTACGTAGGTTT", 0, rc = FALSE))
 
 many_matches <- sassy_search(
   c("hello", "world"),

@@ -21,6 +21,9 @@
   direction.
 * Added class `sassy_matches` and `print.sassy_matches()`.
 * Added optional ANSI coloring for printed match regions.
+* Added SAM-compatible reverse-strand formatting with `sam = TRUE` and
+  `sassy_as_sam()`.
+* Added `sassy_crispr()` for in-memory CRISPR guide target searches.
 * Added R connection input through `sassy_search_connection()`.
 * Added result columns `pattern_idx`, `text_idx`, `text_start`, `text_end`,
   `pattern_start`, `pattern_end`, `cost`, `strand`, and `cigar`.

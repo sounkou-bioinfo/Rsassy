@@ -12,7 +12,8 @@ sassy_searcher_search(
   all = FALSE,
   threads = 1L,
   mode = "single",
-  match_region = FALSE
+  match_region = FALSE,
+  sam = FALSE
 )
 }
 \arguments{
@@ -31,6 +32,9 @@ sassy_searcher_search(
 \item{match_region}{If \code{TRUE}, include a \code{match_region} column. Reverse-strand
 regions are reverse-complemented so the region and CIGAR are in the input
 pattern direction.}
+
+\item{sam}{If \code{TRUE}, format reverse-strand \code{match_region} and \code{cigar} in the
+text direction used by SAM and by the upstream \code{sassy --sam} output.}
 }
 \value{
 A data frame with 0-based indices and coordinates: \code{pattern_idx}, \code{text_idx}, \code{text_start}, \code{text_end}, \code{pattern_start}, \code{pattern_end}, \code{cost}, \code{strand}, and \code{cigar}. If requested, also includes \code{match_region}.

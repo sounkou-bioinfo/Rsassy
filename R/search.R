@@ -125,6 +125,8 @@ sassy_searcher <- function(alphabet = "dna", rc = TRUE, alpha = NULL) {
 #' @param match_region If `TRUE`, include a `match_region` column. Reverse-strand
 #'   regions are reverse-complemented so the region and CIGAR are in the input
 #'   pattern direction.
+#' @param sam If `TRUE`, format reverse-strand `match_region` and `cigar` in the
+#'   text direction used by SAM and by the upstream `sassy --sam` output.
 #' @return A data frame with 0-based indices and coordinates: `pattern_idx`, `text_idx`, `text_start`, `text_end`, `pattern_start`, `pattern_end`, `cost`, `strand`, and `cigar`. If requested, also includes `match_region`.
 #' @export
 sassy_searcher_search <- function(searcher,
@@ -134,8 +136,9 @@ sassy_searcher_search <- function(searcher,
                                   all = FALSE,
                                   threads = 1L,
                                   mode = "single",
-                                  match_region = FALSE) {
-  .Call(
+                                  match_region = FALSE,
+                                  sam = FALSE) {
+  out <- .Call(
     "RC_sassy_searcher_search",
     searcher,
     pattern,
@@ -147,6 +150,10 @@ sassy_searcher_search <- function(searcher,
     match_region,
     PACKAGE = "Rsassy"
   )
+  if (sassy_logical_scalar(sam, "sam")) {
+    out <- sassy_as_sam(out, alphabet = attr(searcher, "alphabet", exact = TRUE))
+  }
+  out
 }
 
 #' Search approximate matches with 'sassy'
@@ -169,7 +176,8 @@ sassy_search <- function(pattern,
                          all = FALSE,
                          threads = 1L,
                          mode = "single",
-                         match_region = FALSE) {
+                         match_region = FALSE,
+                         sam = FALSE) {
   searcher <- sassy_searcher(alphabet = alphabet, rc = rc, alpha = alpha)
   sassy_searcher_search(
     searcher,
@@ -179,7 +187,8 @@ sassy_search <- function(pattern,
     all = all,
     threads = threads,
     mode = mode,
-    match_region = match_region
+    match_region = match_region,
+    sam = sam
   )
 }
 
@@ -209,9 +218,10 @@ sassy_search_connection <- function(pattern,
                                     mode = "single",
                                     chunk_size = 1024 * 1024,
                                     overlap = NULL,
-                                    match_region = FALSE) {
+                                    match_region = FALSE,
+                                    sam = FALSE) {
   searcher <- sassy_searcher(alphabet = alphabet, rc = rc, alpha = alpha)
-  .Call(
+  out <- .Call(
     "RC_sassy_searcher_search_connection",
     searcher,
     pattern,
@@ -224,6 +234,289 @@ sassy_search_connection <- function(pattern,
     overlap,
     match_region,
     PACKAGE = "Rsassy"
+  )
+  if (sassy_logical_scalar(sam, "sam")) {
+    out <- sassy_as_sam(out, alphabet = alphabet)
+  }
+  out
+}
+
+#' Format matches in SAM-compatible text direction
+#'
+#' Rsassy normally follows the upstream `sassy` TSV convention: reverse-strand
+#' `match_region` values are reverse-complemented and CIGAR strings are oriented
+#' in the input pattern direction. `sassy_as_sam()` converts reverse-strand rows
+#' to the text direction used by SAM and by upstream `sassy --sam` output.
+#'
+#' @param x A `sassy_matches` data frame.
+#' @param alphabet Alphabet profile used for the search. One of `"dna"` or
+#'   `"iupac"` when `x` includes `match_region`.
+#' @return A copy of `x` with reverse-strand `cigar` values reversed and, when
+#'   present, reverse-strand `match_region` values reverse-complemented back to
+#'   text direction.
+#' @examples
+#' sassy_as_sam(
+#'   sassy_search("ACGA", "TTTCGTTT", 0, alphabet = "dna", match_region = TRUE),
+#'   alphabet = "dna"
+#' )
+#' @export
+sassy_as_sam <- function(x, alphabet = "dna") {
+  if (!is.data.frame(x)) {
+    stop("x must be a data frame returned by Rsassy", call. = FALSE)
+  }
+  if (!all(c("strand", "cigar") %in% names(x))) {
+    stop("x must contain strand and cigar columns", call. = FALSE)
+  }
+
+  out <- x
+  rc <- !is.na(out$strand) & out$strand == "-"
+  if (!any(rc)) {
+    return(out)
+  }
+
+  out$cigar[rc] <- sassy_reverse_cigar(out$cigar[rc])
+  if ("match_region" %in% names(out)) {
+    alphabet <- sassy_alphabet_scalar(alphabet)
+    if (!alphabet %in% c("dna", "iupac")) {
+      stop("SAM match_region formatting requires alphabet = 'dna' or 'iupac'", call. = FALSE)
+    }
+    out$match_region[rc] <- sassy_reverse_complement(out$match_region[rc])
+  }
+  out
+}
+
+#' Search CRISPR guide targets
+#'
+#' `sassy_crispr()` is an R-level equivalent of the upstream `sassy crispr`
+#' workflow for in-memory sequences. Guides include the PAM at the end. By
+#' default, the PAM must match exactly under IUPAC matching, while the rest of
+#' the guide may have up to `k` edits.
+#'
+#' @param guide Character vector of guide sequences including the PAM suffix.
+#' @param text Text sequences to search; a character vector, raw vector, or list
+#'   of raw/character scalars accepted by [sassy_search()].
+#' @param k Maximum edit distance for the searched guide sequence. With
+#'   `allow_pam_edits = FALSE`, the exact-PAM filter means this is effectively
+#'   the edit threshold outside the PAM.
+#' @param pam_length Length of the PAM suffix.
+#' @param allow_pam_edits If `TRUE`, do not require an exact PAM match.
+#' @param max_n_frac Maximum allowed fraction of `N` bases in `match_region`.
+#' @param rc If `TRUE`, search reverse-complement targets as well.
+#' @param threads Number of worker threads to request.
+#' @param text_id Optional text identifiers. Defaults to names on `text` when
+#'   all names are non-empty, otherwise `text_1`, `text_2`, ...
+#' @return A data frame with CLI-style columns: `guide`, `text_id`, `cost`,
+#'   `strand`, `start`, `end`, `match_region`, and `cigar`.
+#' @examples
+#' sassy_crispr("ACGTNGG", c(chr1 = "TTTACGTAGGTTT"), k = 0, rc = FALSE)
+#' @export
+sassy_crispr <- function(guide,
+                         text,
+                         k,
+                         pam_length = 3L,
+                         allow_pam_edits = FALSE,
+                         max_n_frac = 0.2,
+                         rc = TRUE,
+                         threads = 1L,
+                         text_id = NULL) {
+  guide <- sassy_character_vector(guide, "guide")
+  pam_length <- sassy_whole_number(pam_length, "pam_length", min = 1L)
+  allow_pam_edits <- sassy_logical_scalar(allow_pam_edits, "allow_pam_edits")
+  rc <- sassy_logical_scalar(rc, "rc")
+  max_n_frac <- sassy_fraction_scalar(max_n_frac, "max_n_frac")
+  text_ids <- sassy_text_ids(text, text_id)
+
+  guide_len <- nchar(guide, type = "bytes", allowNA = FALSE, keepNA = FALSE)
+  if (any(guide_len < pam_length)) {
+    stop("all guide sequences must be at least pam_length bytes long", call. = FALSE)
+  }
+  pam <- substring(guide, guide_len - pam_length + 1L, guide_len)
+  if (length(unique(pam)) != 1L) {
+    stop("all guide sequences must have the same PAM suffix", call. = FALSE)
+  }
+
+  matches <- sassy_search(
+    pattern = guide,
+    text = text,
+    k = k,
+    alphabet = "iupac",
+    rc = rc,
+    all = TRUE,
+    threads = threads,
+    mode = "single",
+    match_region = TRUE,
+    sam = FALSE
+  )
+  if (nrow(matches) == 0L) {
+    return(sassy_empty_crispr_matches())
+  }
+
+  keep <- rep(TRUE, nrow(matches))
+  if (!allow_pam_edits) {
+    region_pam <- sassy_suffix(matches$match_region, pam_length)
+    keep <- keep & sassy_iupac_matches(region_pam, pam[matches$pattern_idx + 1L])
+  }
+  keep <- keep & sassy_n_fraction(matches$match_region) <= max_n_frac
+  matches <- matches[keep, , drop = FALSE]
+  if (nrow(matches) == 0L) {
+    return(sassy_empty_crispr_matches())
+  }
+
+  row.names(matches) <- NULL
+  data.frame(
+    guide = guide[matches$pattern_idx + 1L],
+    text_id = text_ids[matches$text_idx + 1L],
+    cost = matches$cost,
+    strand = matches$strand,
+    start = matches$text_start,
+    end = matches$text_end,
+    match_region = matches$match_region,
+    cigar = matches$cigar,
+    stringsAsFactors = FALSE
+  )
+}
+
+sassy_reverse_cigar <- function(cigar) {
+  vapply(cigar, function(one) {
+    if (is.na(one)) {
+      return(NA_character_)
+    }
+    matches <- gregexpr("[0-9]+[A-Z=]", one, perl = TRUE)[[1]]
+    if (matches[[1]] == -1L) {
+      return(one)
+    }
+    tokens <- regmatches(one, list(matches))[[1]]
+    if (!identical(paste0(tokens, collapse = ""), one)) {
+      return(one)
+    }
+    paste0(rev(tokens), collapse = "")
+  }, character(1), USE.NAMES = FALSE)
+}
+
+sassy_reverse_complement <- function(x) {
+  comp <- chartr(
+    "ACGTRYSWKMBDHVNXacgtryswkmbdhvnx",
+    "TGCAYRSWMKVHDBNXtgcayrswmkvhdbnx",
+    x
+  )
+  vapply(strsplit(comp, "", useBytes = TRUE), function(chars) {
+    paste0(rev(chars), collapse = "")
+  }, character(1), USE.NAMES = FALSE)
+}
+
+sassy_iupac_matches <- function(query, target) {
+  vapply(seq_along(query), function(i) {
+    query_mask <- sassy_iupac_mask(query[[i]])
+    target_mask <- sassy_iupac_mask(target[[i]])
+    !is.null(query_mask) &&
+      !is.null(target_mask) &&
+      length(query_mask) == length(target_mask) &&
+      all(bitwAnd(query_mask, target_mask) > 0L)
+  }, logical(1), USE.NAMES = FALSE)
+}
+
+sassy_iupac_mask <- function(x) {
+  map <- c(
+    A = 1L, C = 2L, T = 4L, U = 4L, G = 8L,
+    N = 15L, R = 9L, Y = 6L, S = 10L, W = 5L,
+    K = 12L, M = 3L, B = 14L, D = 13L, H = 7L,
+    V = 11L, X = 0L
+  )
+  chars <- toupper(strsplit(x, "", useBytes = TRUE)[[1]])
+  mask <- unname(map[chars])
+  if (anyNA(mask)) {
+    return(NULL)
+  }
+  mask
+}
+
+sassy_suffix <- function(x, n) {
+  len <- nchar(x, type = "bytes", allowNA = FALSE, keepNA = FALSE)
+  substring(x, pmax(1L, len - n + 1L), len)
+}
+
+sassy_n_fraction <- function(x) {
+  len <- nchar(x, type = "bytes", allowNA = FALSE, keepNA = FALSE)
+  n_count <- lengths(regmatches(x, gregexpr("[Nn]", x, perl = TRUE)))
+  ifelse(len == 0L, 0, n_count / len)
+}
+
+sassy_character_vector <- function(x, arg) {
+  if (!is.character(x) || anyNA(x)) {
+    stop(sprintf("%s must be a character vector without NA values", arg), call. = FALSE)
+  }
+  if (length(x) == 0L) {
+    stop(sprintf("%s must not be empty", arg), call. = FALSE)
+  }
+  x
+}
+
+sassy_logical_scalar <- function(x, arg) {
+  if (!is.logical(x) || length(x) != 1L || is.na(x)) {
+    stop(sprintf("%s must be TRUE or FALSE", arg), call. = FALSE)
+  }
+  isTRUE(x)
+}
+
+sassy_alphabet_scalar <- function(x) {
+  if (!is.character(x) || length(x) != 1L || is.na(x)) {
+    stop("alphabet must be a non-missing character scalar", call. = FALSE)
+  }
+  tolower(x)
+}
+
+sassy_whole_number <- function(x, arg, min = 0L) {
+  if (!is.numeric(x) || length(x) != 1L || !is.finite(x) || x != floor(x) || x < min) {
+    stop(sprintf("%s must be a whole number >= %d", arg, min), call. = FALSE)
+  }
+  as.integer(x)
+}
+
+sassy_fraction_scalar <- function(x, arg) {
+  if (!is.numeric(x) || length(x) != 1L || !is.finite(x) || x < 0 || x > 1) {
+    stop(sprintf("%s must be a number in [0, 1]", arg), call. = FALSE)
+  }
+  as.numeric(x)
+}
+
+sassy_sequence_count <- function(x, arg) {
+  if (is.raw(x)) {
+    return(1L)
+  }
+  if (is.character(x) || is.list(x)) {
+    return(length(x))
+  }
+  stop(sprintf("%s must be a raw vector, character vector, or list", arg), call. = FALSE)
+}
+
+sassy_text_ids <- function(text, text_id = NULL) {
+  n <- sassy_sequence_count(text, "text")
+  if (!is.null(text_id)) {
+    if (!is.character(text_id) || length(text_id) != n || anyNA(text_id)) {
+      stop("text_id must be NULL or a character vector with one entry per text", call. = FALSE)
+    }
+    return(text_id)
+  }
+  if (!is.raw(text)) {
+    text_names <- names(text)
+    if (!is.null(text_names) && length(text_names) == n && all(nzchar(text_names))) {
+      return(text_names)
+    }
+  }
+  paste0("text_", seq_len(n))
+}
+
+sassy_empty_crispr_matches <- function() {
+  data.frame(
+    guide = character(),
+    text_id = character(),
+    cost = integer(),
+    strand = character(),
+    start = numeric(),
+    end = numeric(),
+    match_region = character(),
+    cigar = character(),
+    stringsAsFactors = FALSE
   )
 }
 
