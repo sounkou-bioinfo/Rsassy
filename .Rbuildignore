@@ -24,6 +24,7 @@
 ^webr-repo$
 ^tools/webr-check\.cjs$
 ^tools/python-conformance\.R$
+^tools/cli-conformance\.R$
 ^src/Makevars$
 ^src/Makevars\.win$
 ^src/\.cargo$
