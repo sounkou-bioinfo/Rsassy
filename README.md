@@ -5,8 +5,9 @@
 
 [![R-universe](https://sounkou-bioinfo.r-universe.dev/badges/Rsassy)](https://sounkou-bioinfo.r-universe.dev/Rsassy)
 
-R bindings to Sassy through R’s native C API. Results are returned as
-data frames with 0-based coordinates and CIGAR strings.
+R bindings to [Sassy](https://github.com/RagnarGrootKoerkamp/sassy)
+through R’s native C API. Results are returned as data frames with
+0-based coordinates and CIGAR strings.
 
 ## Install
 
@@ -23,8 +24,9 @@ Source installs require Cargo/rustc \>= 1.91 and `xz`. Rust crates are
 vendored in `src/rust/vendor.tar.xz` for offline package builds. On
 Linux, macOS, and Windows, Rsassy installs multiple backend libraries
 when possible: scalar, AVX2, and AVX-512 on x86_64; scalar and NEON on
-arm64. Rsassy selects the best installed backend supported by the
-current CPU/runtime when the backend is first loaded.
+arm64. The webR/WebAssembly build uses wasm SIMD128. Rsassy selects the
+best installed backend supported by the current CPU/runtime when the
+backend is first loaded.
 
 ## Usage
 
