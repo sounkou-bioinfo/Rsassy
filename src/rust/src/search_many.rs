@@ -203,7 +203,7 @@ pub(crate) fn validate_mode_for_profile(
     ) && alphabet != "iupac"
     {
         return Err(format!(
-            "mode '{}' currently requires alphabet = 'iupac'",
+            "mode '{}' uses Sassy multi-pattern encoding and requires alphabet = 'iupac'",
             mode.as_str()
         ));
     }

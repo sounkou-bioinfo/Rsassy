@@ -36,7 +36,7 @@ sassy_search_connection(
 
 \item{threads}{Number of worker threads to request for bulk searches.}
 
-\item{mode}{Bulk search mode. \code{"single"} searches each pair independently; \code{"batch_texts"} uses one text per SIMD lane; \code{"batch_patterns"} uses one pattern per SIMD lane and currently requires \code{alphabet = "iupac"} plus equal pattern lengths; \code{"encoded_patterns"} (alias \code{"v2"}) uses Sassy's encoded-pattern path and currently also requires \code{alphabet = "iupac"} plus equal pattern lengths.}
+\item{mode}{Bulk search mode. \code{"single"} searches each pair independently; \code{"batch_texts"} uses one text per SIMD lane. \code{"batch_patterns"} and \code{"encoded_patterns"} (alias \code{"v2"}) use Sassy's multi-pattern encoding, which in \code{sassy} 0.2.1 is implemented for \code{alphabet = "iupac"} and equal byte-length patterns.}
 
 \item{chunk_size}{Number of new bytes to read per native chunk.}
 
