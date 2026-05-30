@@ -1,11 +1,10 @@
 # Searching R Connections
 
 [`sassy_search_connection()`](https://sounkou-bioinfo.github.io/Rsassy/reference/sassy_search_connection.md)
-searches an already-open readable R connection. This avoids an R-level
-[`readBin()`](https://rdrr.io/r/base/readBin.html) loop and keeps a
-native overlap window so matches can cross chunk boundaries.
+searches an open readable R connection. Matches may cross chunk
+boundaries.
 
-## Basic workflow
+## Example
 
 ``` r
 
@@ -23,18 +22,21 @@ sassy_search_connection(
   rc = FALSE,
   mode = "encoded_patterns"
 )
+#> <sassy_matches> 2 matches
+#> pattern_idx text_idx text_start text_end pattern_start pattern_end cost strand cigar
+#>           0        0          4        7             0           3    0      +    3=
+#>           1        0         11       14             0           3    0      +    3=
 close(con)
 unlink(tmp)
 ```
 
-The returned coordinates are relative to the full stream, not to
-individual chunks.
+Coordinates are relative to the full stream.
 
-## Chunking and overlap
+## Chunking
 
-`chunk_size` controls how many new bytes are read per native chunk. If
-`overlap = NULL`, the C shim computes a conservative overlap from the
-longest pattern, `k`, and the overhang setting.
+`chunk_size` controls the number of new bytes read per chunk. If
+`overlap` is `NULL`, Rsassy computes it from the longest pattern, `k`,
+and `alpha`.
 
 ``` r
 
@@ -47,9 +49,8 @@ sassy_search_connection(
   rc = FALSE,
   chunk_size = 6
 )
+#> <sassy_matches> 1 match
+#> pattern_idx text_idx text_start text_end pattern_start pattern_end cost strand cigar
+#>           0        0          4        8             0           4    0      +    4=
 close(con)
 ```
-
-Open compressed connections, such as
-[`gzfile()`](https://rdrr.io/r/base/connections.html), in binary mode
-when possible.

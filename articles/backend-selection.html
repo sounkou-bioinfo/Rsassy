@@ -37,7 +37,7 @@
     <li><a class="dropdown-item" href="../articles/api-and-coordinates.html">API and Coordinates</a></li>
     <li><a class="dropdown-item" href="../articles/connection-search.html">Searching R Connections</a></li>
     <li><a class="dropdown-item" href="../articles/backend-selection.html">Backend Selection</a></li>
-    <li><a class="dropdown-item" href="../articles/source-installation-and-vendoring.html">Source Installation and Vendoring</a></li>
+    <li><a class="dropdown-item" href="../articles/source-installation-and-vendoring.html">Development and Vendoring</a></li>
   </ul>
 </li>
 <li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
@@ -69,53 +69,60 @@
 
     
     
-<p>Native <code>Rsassy</code> installs a small R/C shim plus Rust
-backend libraries. The C shim selects one backend per R process.</p>
+<p>Rsassy installs a C shim plus Rust backend libraries. One backend is
+selected per R process.</p>
 <div class="section level2">
-<h2 id="default-selection">Default selection<a class="anchor" aria-label="anchor" href="#default-selection"></a>
+<h2 id="auto-selection">Auto selection<a class="anchor" aria-label="anchor" href="#auto-selection"></a>
 </h2>
-<p>With the default <code>"auto"</code> setting, Rsassy chooses the best
-installed backend supported by the current runtime:</p>
+<p><code>backend = "auto"</code> uses the first installed and supported
+backend in this order:</p>
 <ol style="list-style-type: decimal">
-<li>WebAssembly SIMD128 on wasm builds</li>
-<li>AVX-512 on supported x86_64 machines</li>
-<li>AVX2 on supported x86_64 machines</li>
-<li>NEON on supported arm64 machines</li>
-<li>scalar fallback</li>
+<li><code>wasm_simd128</code></li>
+<li><code>avx512</code></li>
+<li><code>avx2</code></li>
+<li><code>neon</code></li>
+<li><code>scalar</code></li>
 </ol>
-<p>Inspect the installed package with:</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">features</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/sassy_features.html">sassy_features</a></span><span class="op">(</span><span class="op">)</span></span>
-<span><span class="va">features</span><span class="op">[</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span></span>
-<span>  <span class="st">"rsassy_dispatch"</span>,</span>
-<span>  <span class="st">"rsassy_selected_backend"</span>,</span>
-<span>  <span class="st">"rsassy_installed_backends"</span>,</span>
-<span>  <span class="st">"rsassy_supported_backends"</span></span>
-<span><span class="op">)</span><span class="op">]</span></span></code></pre></div>
+<code class="sourceCode R"><span><span class="fu"><a href="../reference/sassy_features.html">sassy_features</a></span><span class="op">(</span><span class="op">)</span></span>
+<span><span class="co">#&gt; &lt;sassy_features&gt;</span></span>
+<span><span class="co">#&gt; dispatch: dynamic</span></span>
+<span><span class="co">#&gt; selected backend: avx2</span></span>
+<span><span class="co">#&gt; installed backends: scalar, avx2, avx512</span></span>
+<span><span class="co">#&gt; supported backends: scalar, avx2</span></span>
+<span><span class="co">#&gt; CPU: avx2=yes avx512f=no neon=no</span></span>
+<span><span class="co">#&gt; Rust backend: avx2 (native_simd=yes)</span></span></code></pre></div>
 </div>
 <div class="section level2">
-<h2 id="explicit-backend-requests">Explicit backend requests<a class="anchor" aria-label="anchor" href="#explicit-backend-requests"></a>
+<h2 id="explicit-selection">Explicit selection<a class="anchor" aria-label="anchor" href="#explicit-selection"></a>
 </h2>
-<p>Use <code><a href="../reference/sassy_set_backend.html">sassy_set_backend()</a></code> before the first native Rsassy
-call when benchmarking or debugging a specific backend.</p>
+<p>Call <code><a href="../reference/sassy_set_backend.html">sassy_set_backend()</a></code> before any other Rsassy native
+call. Backend loading is one-shot, so test another backend in a new R
+process.</p>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/sounkou-bioinfo/Rsassy" class="external-link">Rsassy</a></span><span class="op">)</span></span>
-<span><span class="fu"><a href="../reference/sassy_set_backend.html">sassy_set_backend</a></span><span class="op">(</span><span class="st">"scalar"</span><span class="op">)</span></span>
-<span><span class="fu"><a href="../reference/sassy_features.html">sassy_features</a></span><span class="op">(</span><span class="op">)</span><span class="op">$</span><span class="va">rsassy_selected_backend</span></span></code></pre></div>
-<p>Backend loading is intentionally one-shot. <code>Rsassy</code> does
-not unload and reload native backend DLLs in-process because doing so is
-not portable across R platforms. Benchmark different backends in
-separate fresh <code>Rscript</code> processes.</p>
+<code class="sourceCode R"><span><span class="va">script</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempfile</a></span><span class="op">(</span>fileext <span class="op">=</span> <span class="st">".R"</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/writeLines.html" class="external-link">writeLines</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span></span>
+<span>  <span class="st">"library(Rsassy)"</span>,</span>
+<span>  <span class="st">"sassy_set_backend('scalar')"</span>,</span>
+<span>  <span class="st">"print(sassy_features())"</span></span>
+<span><span class="op">)</span>, <span class="va">script</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/system2.html" class="external-link">system2</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/file.path.html" class="external-link">file.path</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/Rhome.html" class="external-link">R.home</a></span><span class="op">(</span><span class="st">"bin"</span><span class="op">)</span>, <span class="st">"Rscript"</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"--vanilla"</span>, <span class="va">script</span><span class="op">)</span>, stdout <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>, sep <span class="op">=</span> <span class="st">"\n"</span><span class="op">)</span></span>
+<span><span class="co">#&gt; &lt;sassy_features&gt;</span></span>
+<span><span class="co">#&gt; dispatch: dynamic</span></span>
+<span><span class="co">#&gt; selected backend: scalar</span></span>
+<span><span class="co">#&gt; installed backends: scalar, avx2, avx512</span></span>
+<span><span class="co">#&gt; supported backends: scalar, avx2</span></span>
+<span><span class="co">#&gt; CPU: avx2=yes avx512f=no neon=no</span></span>
+<span><span class="co">#&gt; Rust backend: portable_scalar (native_simd=no)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/unlink.html" class="external-link">unlink</a></span><span class="op">(</span><span class="va">script</span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level2">
-<h2 id="why-not-one-static-library">Why not one static library?<a class="anchor" aria-label="anchor" href="#why-not-one-static-library"></a>
+<h2 id="why-separate-backend-libraries">Why separate backend libraries?<a class="anchor" aria-label="anchor" href="#why-separate-backend-libraries"></a>
 </h2>
-<p>The upstream <code>sassy</code> crate selects SIMD behavior through
-crate/build-level configuration and SIMD-dependent types. That makes a
-single function-pointer multiversioning layer harder than in small demos
-where every backend is an explicit leaf function. The current package
-therefore uses separate backend libraries for native platforms and a
-static Rust path for webR/wasm.</p>
+<p>The <code>sassy</code> crate uses build-time SIMD configuration and
+SIMD-dependent types. The R package therefore builds separate Rust
+libraries for the supported backend families instead of switching
+individual functions at runtime.</p>
 </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside>

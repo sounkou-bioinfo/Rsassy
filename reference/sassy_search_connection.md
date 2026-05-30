@@ -61,8 +61,7 @@ sassy_search_connection(
 
 - threads:
 
-  Number of Rust/Rayon worker threads for native bulk searches. The
-  current Rsassy wasm32/webR build path runs serially.
+  Number of worker threads to request for bulk searches.
 
 - mode:
 

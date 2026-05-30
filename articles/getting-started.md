@@ -1,12 +1,9 @@
 # Getting Started with Rsassy
 
-`Rsassy` exposes the Rust `sassy` approximate string matcher through R’s
-native C API. It is useful for short-pattern approximate search over
-DNA, IUPAC, and ASCII alphabets.
+`Rsassy` provides R bindings to the Rust `sassy` approximate string
+matcher. It searches short patterns in DNA, IUPAC, or ASCII text.
 
-## Installation
-
-Install from r-universe:
+## Install
 
 ``` r
 
@@ -16,44 +13,40 @@ install.packages(
 )
 ```
 
-A checkout install resolves the `sassy` Rust crate from crates.io:
-
-``` sh
-R CMD INSTALL .
-```
-
-## A minimal search
+## Search
 
 ``` r
 
 library(Rsassy)
 
-sassy_search(
-  pattern = "ATCGATCG",
-  text = "GGGGATCGATCGTTTT",
-  k = 1,
-  alphabet = "dna"
-)
+sassy_search("ATCGATCG", "GGGGATCGATCGTTTT", k = 1, alphabet = "dna")
+#> <sassy_matches> 3 matches
+#> pattern_idx text_idx text_start text_end pattern_start pattern_end cost strand  cigar
+#>           0        0          4       12             0           8    0      +     8=
+#>           0        0          6       14             0           8    1      - 1=1X6=
+#>           0        0          2       10             0           8    1      -   7=1X
 ```
 
 The result is a `sassy_matches` data frame. Coordinates are 0-based and
-half-open, following the Rust library.
+half-open.
 
-## Reusing a searcher
-
-Create a searcher once when multiple calls share the same alphabet and
-reverse-complement behavior:
+## Reuse a searcher
 
 ``` r
 
 searcher <- sassy_searcher("dna", rc = TRUE)
 sassy_searcher_search(searcher, "ATCGATCG", "GGGGATCGATCGTTTT", k = 1)
+#> <sassy_matches> 3 matches
+#> pattern_idx text_idx text_start text_end pattern_start pattern_end cost strand  cigar
+#>           0        0          4       12             0           8    0      +     8=
+#>           0        0          6       14             0           8    1      - 1=1X6=
+#>           0        0          2       10             0           8    1      -   7=1X
 ```
 
-## Searching multiple inputs
+## Multiple patterns or texts
 
-Character vectors search every pattern against every text. The
-`pattern_idx` and `text_idx` columns identify the 0-based input indices.
+Vector inputs search every pattern against every text. `pattern_idx` and
+`text_idx` identify the input indices.
 
 ``` r
 
@@ -65,4 +58,8 @@ sassy_search(
   rc = FALSE,
   mode = "encoded_patterns"
 )
+#> <sassy_matches> 2 matches
+#> pattern_idx text_idx text_start text_end pattern_start pattern_end cost strand cigar
+#>           0        0          4        7             0           3    0      +    3=
+#>           1        0         11       14             0           3    0      +    3=
 ```

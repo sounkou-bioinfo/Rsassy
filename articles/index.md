@@ -16,5 +16,5 @@
 
 - [Backend
   Selection](https://sounkou-bioinfo.github.io/Rsassy/articles/backend-selection.md):
-- [Source Installation and
+- [Development and
   Vendoring](https://sounkou-bioinfo.github.io/Rsassy/articles/source-installation-and-vendoring.md):

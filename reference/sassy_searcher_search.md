@@ -3,10 +3,8 @@
 `pattern` and `text` may be single sequences or vectors/lists of
 sequences. When vectors are supplied, every pattern is searched against
 every text and the returned `pattern_idx` and `text_idx` columns
-identify the 0-based input indices. Native builds can use Rayon threads
-for bulk search when `threads > 1`; the current Rsassy wasm32/webR build
-path keeps the same API but runs the bulk loop serially until threaded
-webR execution is explicitly enabled and validated.
+identify the 0-based input indices. Use `threads > 1` for larger
+batches.
 
 ## Usage
 
@@ -46,8 +44,7 @@ sassy_searcher_search(
 
 - threads:
 
-  Number of Rust/Rayon worker threads for native bulk searches. The
-  current Rsassy wasm32/webR build path runs serially.
+  Number of worker threads to request for bulk searches.
 
 - mode:
 
