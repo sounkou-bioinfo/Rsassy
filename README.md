@@ -27,12 +27,15 @@ From a checkout:
 R CMD INSTALL .
 ```
 
-Source packages include vendored Rust crates and build offline. Native
-Rsassy builds are multiversion by default: x86_64 builds install scalar,
-AVX2, and AVX-512 backends; arm64 builds install scalar and NEON
-backends. Rsassy selects the best installed backend supported by the
-current CPU/runtime when the native backend is first loaded.
-webR/WebAssembly builds use `wasm32-unknown-emscripten` with SIMD128.
+Checkout installs resolve the `sassy` Rust crate from crates.io. For
+CRAN/offline source packages, run `make vendor-rust` before
+`R CMD build` to add `src/rust/vendor.tar.xz`; that generated bundle is
+not committed by default. Native Rsassy builds are multiversion by
+default: x86_64 builds install scalar, AVX2, and AVX-512 backends; arm64
+builds install scalar and NEON backends. Rsassy selects the best
+installed backend supported by the current CPU/runtime when the native
+backend is first loaded. webR/WebAssembly builds use
+`wasm32-unknown-emscripten` with SIMD128.
 
 ## Usage
 
@@ -229,18 +232,19 @@ bench
 #> 1            scalar           scalar      50       50       2500
 #> 2              avx2             avx2      50       50       2500
 #>   matches_per_search elapsed_seconds mb_per_second speedup_vs_scalar
-#> 1                 50           1.232      2029.221           1.00000
-#> 2                 50           0.663      3770.739           1.85822
+#> 1                 50           1.281      1951.600              1.00
+#> 2                 50           0.700      3571.429              1.83
 ```
 
 ## Check
 
+From the standalone Rsassy repository root:
+
 ``` sh
-cd r/Rsassy
 make check
 ```
 
 Useful targets include `make readme`, `make rd`, `make install`,
-`make test`, and `make clean`. `make check` uses a CRAN-safe default of
-two Cargo build jobs; use `make check-fast` or
+`make test`, `make vendor-rust`, and `make clean`. `make check` uses a
+CRAN-safe default of two Cargo build jobs; use `make check-fast` or
 `make CARGO_JOBS=10 check` for local multithreaded Cargo builds.

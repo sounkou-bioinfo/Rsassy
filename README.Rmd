@@ -194,12 +194,13 @@ bench
 
 ## Check
 
+From the standalone Rsassy repository root:
+
 ```sh
-cd r/Rsassy
 make check
 ```
 
 Useful targets include `make readme`, `make rd`, `make install`, `make test`,
-and `make clean`. `make check` uses a CRAN-safe default of two Cargo build jobs;
-use `make check-fast` or `make CARGO_JOBS=10 check` for local multithreaded
-Cargo builds.
+`make vendor-rust`, and `make clean`. `make check` uses a CRAN-safe default of
+two Cargo build jobs; use `make check-fast` or `make CARGO_JOBS=10 check` for
+local multithreaded Cargo builds.

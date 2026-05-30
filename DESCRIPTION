@@ -4,7 +4,7 @@ Version: 0.2.1-0.1.0.9000
 Authors@R: c(
     person(given = "Sounkou Mahamane", family = "Toure",
       email = "sounkoutoure@gmail.com", role = c("aut", "cre")),
-    person("Ragnar", "Groot Koerkamp", role = c("aut", "cph")),
+    person("Ragnar", "Groot Koerkamp", role = "cph"),
     person("Rick", "Beeloo", role = c("ctb", "cph"))
   )
 Description: Fast approximate string matching for short patterns in longer
