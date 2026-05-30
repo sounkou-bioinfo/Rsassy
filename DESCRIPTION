@@ -1,0 +1,23 @@
+Package: Rsassy
+Title: R Bindings to the 'sassy' Approximate String Matcher
+Version: 0.2.1-0.1.0.9000
+Authors@R: c(
+    person(given = "Sounkou Mahamane", family = "Toure",
+      email = "sounkoutoure@gmail.com", role = c("aut", "cre")),
+    person("Ragnar", "Groot Koerkamp", role = c("aut", "cph")),
+    person("Rick", "Beeloo", role = c("ctb", "cph"))
+  )
+Description: Fast approximate string matching for short patterns in longer
+    texts using the 'sassy' Rust crate. 'sassy' implements SIMD-accelerated
+    fuzzy search over ASCII, DNA, and IUPAC alphabets, with support for
+    reverse-complement search, overhang alignments, CIGAR strings, and batched
+    searches. See Beeloo and Groot Koerkamp (2025)
+    <doi:10.1101/2025.07.22.666207> and Beeloo and Groot Koerkamp (2026)
+    <doi:10.64898/2026.03.10.710811>.
+License: file LICENSE
+Encoding: UTF-8
+SystemRequirements: Cargo (Rust's package manager), rustc >= 1.91.0, xz
+Suggests:
+    tinytest
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.3

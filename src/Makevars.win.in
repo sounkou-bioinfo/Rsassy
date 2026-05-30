@@ -1,0 +1,79 @@
+TARGET = $(subst 64,x86_64,$(subst 32,i686,$(WIN)))-pc-windows-gnu
+TARGET_DIR = ./rust/target
+LIBDIR = $(TARGET_DIR)/$(TARGET)/release
+RUST_STAMP = $(TARGET_DIR)/rsassy-build.stamp
+BACKEND_DIR = rsassy-backends
+PKG_LIBS = @RSASSY_PKG_LIBS@
+
+all: $(SHLIB)
+
+.PHONY: $(RUST_STAMP)
+
+$(SHLIB): $(RUST_STAMP)
+
+CARGOTMP = $(CURDIR)/.cargo
+VENDOR_DIR = vendor
+
+$(RUST_STAMP):
+	set -e; \
+	rm -f ./rust/Cargo.lock; \
+	mkdir -p $(TARGET_DIR)/libgcc_mock; \
+	touch $(TARGET_DIR)/libgcc_mock/libgcc_eh.a; \
+	CARGO_JOBS="$${CARGO_BUILD_JOBS:-2}"; \
+	CARGO_FLAGS="-j $$CARGO_JOBS"; \
+	RUSTFLAGS_BASE="$(RUSTFLAGS)"; \
+	RUST_TARGET="$(TARGET)"; \
+	CARGO_TARGET_FLAG="--target=$$RUST_TARGET"; \
+	RUSTFLAGS_ENV="CARGO_TARGET_$$(printf '%s' "$$RUST_TARGET" | tr '[:lower:]-' '[:upper:]_')_RUSTFLAGS"; \
+	DYLIB_EXT=".dll"; \
+	case "$$RUST_TARGET" in \
+		x86_64-*) BUILD_BACKENDS="scalar,avx2,avx512";; \
+		aarch64-*) BUILD_BACKENDS="scalar,neon";; \
+		*) BUILD_BACKENDS="scalar";; \
+	esac; \
+	if [ -d ./vendor ]; then \
+		echo "=== Using offline Rust vendor directory ==="; \
+		mkdir -p $(CARGOTMP); \
+		cp rust/vendor-config.toml $(CARGOTMP)/config.toml; \
+		CARGO_FLAGS="--offline -j $$CARGO_JOBS"; \
+	elif [ -f ./rust/vendor.tar.xz ]; then \
+		echo "=== Using offline Rust vendor tarball ==="; \
+		tar xf rust/vendor.tar.xz; \
+		mkdir -p $(CARGOTMP); \
+		cp rust/vendor-config.toml $(CARGOTMP)/config.toml; \
+		CARGO_FLAGS="--offline -j $$CARGO_JOBS"; \
+	fi; \
+	export CARGO_HOME=$(CARGOTMP); \
+	export LIBRARY_PATH="$(LIBRARY_PATH);$(CURDIR)/$(TARGET_DIR)/libgcc_mock"; \
+	export PATH="$(PATH):$(HOME)/.cargo/bin"; \
+	rustc --version; \
+	cargo --version; \
+	mkdir -p $(BACKEND_DIR) $(LIBDIR); \
+	build_backend() { \
+		backend="$$1"; features="$$2"; rustflags_extra="$$3"; \
+		target_dir="$(TARGET_DIR)/$$backend"; \
+		feature_args="--no-default-features --features $$features"; \
+		echo "=== Building Rsassy Rust backend: $$backend ($$features $$rustflags_extra) ==="; \
+		env "$$RUSTFLAGS_ENV=$$RUSTFLAGS_BASE $$rustflags_extra --print=native-static-libs" cargo build $$CARGO_FLAGS $$feature_args $$CARGO_TARGET_FLAG --lib --release --manifest-path=./rust/Cargo.toml --target-dir="$$target_dir"; \
+		rel="$$target_dir/$$RUST_TARGET/release"; \
+		for dylib in "$$rel/librsassy_rust$$DYLIB_EXT" "$$rel/rsassy_rust$$DYLIB_EXT"; do \
+			if [ -f "$$dylib" ]; then cp "$$dylib" "$(BACKEND_DIR)/rsassy_backend_$$backend$$DYLIB_EXT"; break; fi; \
+		done; \
+	}; \
+	old_ifs="$$IFS"; IFS=','; \
+	for backend in $$BUILD_BACKENDS; do \
+		IFS="$$old_ifs"; \
+		case "$$backend" in \
+			scalar) build_backend scalar portable "";; \
+			avx2) build_backend avx2 native-simd "-C target-cpu=x86-64-v3";; \
+			avx512) build_backend avx512 native-simd "-C target-cpu=x86-64-v4";; \
+			neon) build_backend neon native-simd "";; \
+			*) echo "ERROR: unknown Rsassy backend '$$backend'" >&2; exit 1;; \
+		esac; \
+		IFS=','; \
+	done; \
+	IFS="$$old_ifs"; \
+	touch "$(RUST_STAMP)"
+
+clean:
+	rm -Rf $(SHLIB) $(RUST_STAMP) $(OBJECTS) $(CARGOTMP) $(VENDOR_DIR) $(BACKEND_DIR) $(TARGET_DIR) rust/Cargo.lock

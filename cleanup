@@ -1,0 +1,2 @@
+#!/bin/sh
+rm -Rf src/.cargo src/Makevars src/Makevars.win src/vendor src/rsassy-backends src/rust/target src/rust/Cargo.lock src/*.o src/*.so src/*.dll src/*.dylib

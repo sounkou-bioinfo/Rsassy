@@ -1,0 +1,29 @@
+[package]
+name = "rsassy-rust"
+publish = false
+version = "0.2.1-0.1.0.9000"
+edition = "2021"
+rust-version = "1.91"
+
+[lib]
+name = "rsassy_rust"
+crate-type = ["staticlib", "cdylib"]
+
+[features]
+default = ["portable"]
+# Portable/CRAN-safe fallback. Package Makevars selects native SIMD
+# features when building installed backend libraries.
+portable = ["sassy/scalar"]
+native-simd = []
+
+[dependencies]
+# Pull sassy from crates.io. CRAN/offline source packages can vendor this
+# dependency with tools/vendor-rust.R; do not require a sibling sassy checkout.
+sassy = { version = "0.2.1", default-features = false }
+rayon = "1.12.0"
+
+[profile.release]
+lto = true
+codegen-units = 1
+
+[workspace]

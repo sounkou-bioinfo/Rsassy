@@ -1,0 +1,38 @@
+#!/bin/sh
+set -e
+
+need_rustc="1.91.0"
+
+if [ -d "$HOME/.cargo/bin" ]; then
+  PATH="$PATH:$HOME/.cargo/bin"
+  export PATH
+fi
+
+if ! command -v rustc >/dev/null 2>&1; then
+  echo "ERROR: rustc >= ${need_rustc} is required to build Rsassy." >&2
+  echo "Install Rust from https://rustup.rs/." >&2
+  exit 1
+fi
+
+if ! command -v cargo >/dev/null 2>&1; then
+  echo "ERROR: Cargo is required to build Rsassy." >&2
+  echo "Install Cargo from https://rustup.rs/." >&2
+  exit 1
+fi
+
+rustc_version=$(rustc --version | sed -n 's/^rustc \([0-9][^ ]*\).*/\1/p')
+rustc_version=${rustc_version%%-*}
+if [ -z "$rustc_version" ]; then
+  echo "ERROR: could not determine rustc version from: $(rustc --version)" >&2
+  exit 1
+fi
+
+"${R_HOME}/bin${R_ARCH_BIN}/Rscript.exe" -e 'args <- commandArgs(TRUE); quit(status = if (utils::compareVersion(args[1], args[2]) < 0) 1L else 0L)' "$rustc_version" "$need_rustc" || {
+  echo "ERROR: rustc >= ${need_rustc} is required; found ${rustc_version}." >&2
+  exit 1
+}
+
+sed 's|@RSASSY_PKG_LIBS@||g' src/Makevars.win.in > src/Makevars.win
+
+echo "using $(rustc --version)"
+echo "using $(cargo --version)"

@@ -1,0 +1,97 @@
+TARGET_DIR = ./rust/target
+LIBDIR = $(TARGET_DIR)/release
+WASM_STATLIB = $(LIBDIR)/librsassy_rust.a
+RUST_STAMP = $(TARGET_DIR)/rsassy-build.stamp
+BACKEND_DIR = rsassy-backends
+PKG_LIBS = @RSASSY_PKG_LIBS@
+
+all: $(SHLIB)
+
+.PHONY: $(RUST_STAMP)
+
+$(SHLIB): $(RUST_STAMP)
+
+CARGOTMP = $(CURDIR)/.cargo
+VENDOR_DIR = vendor
+
+$(RUST_STAMP):
+	set -e; \
+	rm -f ./rust/Cargo.lock; \
+	CARGO_JOBS="$${CARGO_BUILD_JOBS:-2}"; \
+	CARGO_FLAGS="-j $$CARGO_JOBS"; \
+	RUSTFLAGS_BASE="$(RUSTFLAGS)"; \
+	BUILD_BACKENDS=""; \
+	RUST_HOST="$$(rustc -vV | sed -n 's/^host: //p')"; \
+	RUST_TARGET="$$RUST_HOST"; \
+	CARGO_TARGET_FLAG="--target=$$RUST_TARGET"; \
+	RUSTFLAGS_ENV="CARGO_TARGET_$$(printf '%s' "$$RUST_TARGET" | tr '[:lower:]-' '[:upper:]_')_RUSTFLAGS"; \
+	DYLIB_EXT=".so"; \
+	case "$$(uname -s 2>/dev/null || echo unknown)" in \
+		Darwin*) DYLIB_EXT=".dylib";; \
+		MINGW*|MSYS*|CYGWIN*) DYLIB_EXT=".dll";; \
+	esac; \
+	if $(CC) --version 2>/dev/null | grep -qi emscripten; then \
+		RUST_TARGET="wasm32-unknown-emscripten"; \
+		CARGO_TARGET_FLAG="--target=$$RUST_TARGET"; \
+		RUSTFLAGS_ENV="CARGO_TARGET_WASM32_UNKNOWN_EMSCRIPTEN_RUSTFLAGS"; \
+		case " $$RUSTFLAGS_BASE " in \
+			*" target-feature="*"+simd128"*) ;; \
+			*) RUSTFLAGS_BASE="$$RUSTFLAGS_BASE -C target-feature=+simd128";; \
+		esac; \
+		BUILD_BACKENDS="wasm_simd128"; \
+		echo "=== Building Rust for wasm32-unknown-emscripten with wasm simd128 enabled ==="; \
+	fi; \
+	if [ -d ./vendor ]; then \
+		echo "=== Using offline Rust vendor directory ==="; \
+		mkdir -p $(CARGOTMP); \
+		cp rust/vendor-config.toml $(CARGOTMP)/config.toml; \
+		CARGO_FLAGS="--offline -j $$CARGO_JOBS"; \
+	elif [ -f ./rust/vendor.tar.xz ]; then \
+		echo "=== Using offline Rust vendor tarball ==="; \
+		tar xf rust/vendor.tar.xz; \
+		mkdir -p $(CARGOTMP); \
+		cp rust/vendor-config.toml $(CARGOTMP)/config.toml; \
+		CARGO_FLAGS="--offline -j $$CARGO_JOBS"; \
+	fi; \
+	export CARGO_HOME=$(CARGOTMP); \
+	export PATH="$(PATH):$(HOME)/.cargo/bin"; \
+	rustc --version; \
+	cargo --version; \
+	if [ -z "$$BUILD_BACKENDS" ]; then \
+		case "$$RUST_HOST" in \
+				x86_64-*) BUILD_BACKENDS="scalar,avx2,avx512";; \
+			aarch64-*) BUILD_BACKENDS="scalar,neon";; \
+			*) BUILD_BACKENDS="scalar";; \
+		esac; \
+	fi; \
+	mkdir -p $(BACKEND_DIR) $(LIBDIR); \
+	build_backend() { \
+		backend="$$1"; features="$$2"; rustflags_extra="$$3"; \
+		target_dir="$(TARGET_DIR)/$$backend"; \
+		feature_args="--no-default-features --features $$features"; \
+		echo "=== Building Rsassy Rust backend: $$backend ($$features $$rustflags_extra) ==="; \
+		env "$$RUSTFLAGS_ENV=$$RUSTFLAGS_BASE $$rustflags_extra --print=native-static-libs" cargo build $$CARGO_FLAGS $$feature_args $$CARGO_TARGET_FLAG --lib --release --manifest-path=./rust/Cargo.toml --target-dir="$$target_dir"; \
+		rel="$$target_dir/$$RUST_TARGET/release"; \
+		if [ "$$RUST_TARGET" = "wasm32-unknown-emscripten" ] && [ ! -f "$(WASM_STATLIB)" ]; then cp "$$rel/librsassy_rust.a" "$(WASM_STATLIB)"; fi; \
+		for dylib in "$$rel/librsassy_rust$$DYLIB_EXT" "$$rel/rsassy_rust$$DYLIB_EXT"; do \
+			if [ -f "$$dylib" ]; then cp "$$dylib" "$(BACKEND_DIR)/rsassy_backend_$$backend$$DYLIB_EXT"; break; fi; \
+		done; \
+	}; \
+	old_ifs="$$IFS"; IFS=','; \
+	for backend in $$BUILD_BACKENDS; do \
+		IFS="$$old_ifs"; \
+		case "$$backend" in \
+			scalar) build_backend scalar portable "";; \
+			avx2) build_backend avx2 native-simd "-C target-cpu=x86-64-v3";; \
+			avx512) build_backend avx512 native-simd "-C target-cpu=x86-64-v4";; \
+			neon) build_backend neon native-simd "";; \
+			wasm_simd128) build_backend wasm_simd128 portable "";; \
+			*) echo "ERROR: unknown Rsassy backend '$$backend'" >&2; exit 1;; \
+		esac; \
+		IFS=','; \
+	done; \
+	IFS="$$old_ifs"; \
+	touch "$(RUST_STAMP)"
+
+clean:
+	rm -Rf $(SHLIB) $(WASM_STATLIB) $(RUST_STAMP) $(OBJECTS) $(CARGOTMP) $(VENDOR_DIR) $(BACKEND_DIR) $(TARGET_DIR) rust/Cargo.lock
