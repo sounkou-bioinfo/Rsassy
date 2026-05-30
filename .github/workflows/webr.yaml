@@ -27,7 +27,7 @@ jobs:
             bash -lc '
               set -euxo pipefail
               make clean || true
-              R CMD build .
+              R CMD build --no-build-vignettes .
               Rscript -e "if (!requireNamespace(\"pak\", quietly = TRUE)) install.packages(\"pak\", repos = \"https://repo.r-wasm.org/\"); pak::pak(\"r-wasm/rwasm\", ask = FALSE)"
               version=$(Rscript -e "cat(read.dcf(\"DESCRIPTION\")[1, \"Version\"])")
               Rscript -e "rwasm::build(sprintf(\"./Rsassy_%s.tar.gz\", read.dcf(\"DESCRIPTION\")[1, \"Version\"]))"

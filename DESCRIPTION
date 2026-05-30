@@ -14,7 +14,7 @@ Description: Fast approximate string matching for short patterns in longer
     searches. See Beeloo and Groot Koerkamp (2025)
     <doi:10.1101/2025.07.22.666207> and Beeloo and Groot Koerkamp (2026)
     <doi:10.64898/2026.03.10.710811>.
-License: file LICENSE
+License: GPL (>= 2)
 Copyright: See inst/AUTHORS and inst/LICENCE.note for bundled Rust crate
     authorship and licensing details.
 Encoding: UTF-8

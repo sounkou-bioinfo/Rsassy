@@ -164,7 +164,7 @@ writeLines(
 
     "Rsassy package code:",
     "- Copyright: Sounkou Mahamane Toure", 
-    "- License: MIT License, as provided in LICENSE.",
+    "- License: GPL (>= 2), as declared in DESCRIPTION.",
     "",
     "Vendored Rust crate components:",
     ""

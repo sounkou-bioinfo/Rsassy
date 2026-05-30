@@ -2,6 +2,7 @@
 
 args <- commandArgs(trailingOnly = TRUE)
 venv <- if (length(args)) args[[1L]] else ".venv"
+venv <- normalizePath(venv, mustWork = TRUE)
 
 library(reticulate)
 use_virtualenv(venv, required = TRUE)

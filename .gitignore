@@ -1,6 +1,7 @@
 .Rproj.user
 .Rhistory
 .RData
+.venv/
 README.html
 src/.cargo
 src/Makevars
