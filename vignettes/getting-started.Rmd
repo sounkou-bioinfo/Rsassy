@@ -28,7 +28,7 @@ install.packages(
 ```{r}
 library(Rsassy)
 
-sassy_search("ATCGATCG", "GGGGATCGATCGTTTT", k = 1, alphabet = "dna")
+sassy_search(list("ATCGATCG"), list("GGGGATCGATCGTTTT"), k = 1, alphabet = "dna")
 ```
 
 The result is a `sassy_matches` data frame. Coordinates are 0-based and
@@ -38,18 +38,20 @@ half-open.
 
 ```{r}
 searcher <- sassy_searcher("dna", rc = TRUE)
-sassy_searcher_search(searcher, "ATCGATCG", "GGGGATCGATCGTTTT", k = 1)
+sassy_searcher_search(searcher, list("ATCGATCG"), list("GGGGATCGATCGTTTT"), k = 1)
 ```
 
 ## Multiple patterns or texts
 
-Vector inputs search every pattern against every text. `pattern_idx` and
-`text_idx` identify the input indices.
+List inputs search every pattern against every text. Each list element may be a
+raw vector or a non-missing character scalar, so callers can mix byte strings,
+regular strings, and ALTREP-backed string elements. `pattern_idx` and `text_idx`
+identify the input indices.
 
 ```{r}
 sassy_search(
-  c("ATG", "TTT"),
-  "CCCCATGCCCCTTT",
+  list("ATG", charToRaw("TTT")),
+  list("CCCCATGCCCCTTT"),
   k = 1,
   alphabet = "iupac",
   rc = FALSE,

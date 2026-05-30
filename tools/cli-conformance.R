@@ -131,8 +131,8 @@ cli_search <- normalize_cli(read_tsv_lines(run_cli(c(
 ))))
 r_search <- search_to_cli(
   sassy_search(
-    unname(patterns),
-    unname(texts),
+    as.list(unname(patterns)),
+    as.list(unname(texts)),
     k = 1,
     alphabet = "iupac",
     rc = FALSE,
@@ -157,8 +157,8 @@ cli_v2 <- normalize_cli(read_tsv_lines(run_cli(c(
 ))))
 r_v2 <- search_to_cli(
   sassy_search(
-    unname(patterns),
-    unname(texts),
+    as.list(unname(patterns)),
+    as.list(unname(texts)),
     k = 1,
     alphabet = "iupac",
     rc = FALSE,
@@ -183,8 +183,8 @@ cli_sam <- normalize_cli(read_tsv_lines(run_cli(c(
 ))))
 r_sam <- search_to_cli(
   sassy_search(
-    "ACGA",
-    unname(sam_texts),
+    list("ACGA"),
+    as.list(unname(sam_texts)),
     k = 0,
     alphabet = "dna",
     match_region = TRUE,
@@ -219,8 +219,8 @@ cli_crispr <- normalize_crispr(utils::read.delim(
   check.names = FALSE
 ))
 r_crispr <- normalize_crispr(sassy_crispr(
-  guide = guides,
-  text = unname(crispr_texts),
+  guide = as.list(guides),
+  text = as.list(unname(crispr_texts)),
   k = 2,
   max_n_frac = 0.2,
   rc = FALSE,

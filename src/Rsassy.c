@@ -92,6 +92,17 @@ static uintptr_t Rsassy_uintptr_scalar(SEXP x, const char *arg, uintptr_t min_va
     return (uintptr_t)value;
 }
 
+static double Rsassy_fraction_scalar(SEXP x, const char *arg) {
+    if ((TYPEOF(x) != REALSXP && TYPEOF(x) != INTSXP) || XLENGTH(x) != 1) {
+        Rf_error("%s must be a numeric scalar in [0, 1]", arg);
+    }
+    double value = Rf_asReal(x);
+    if (!R_FINITE(value) || value < 0 || value > 1) {
+        Rf_error("%s must be a numeric scalar in [0, 1]", arg);
+    }
+    return value;
+}
+
 SEXP RC_sassy_searcher_new(SEXP alphabet_s, SEXP rc_s, SEXP alpha_s) {
     Rsassy_init_backend();
     const char *alphabet = Rsassy_string_scalar(alphabet_s, "alphabet");
@@ -162,44 +173,19 @@ static void Rsassy_fill_sequence_view(SEXP x, const char *arg, struct RsassySeqV
     *view = Rsassy_sequence_view(x, arg);
 }
 
+static void Rsassy_assert_sequence_list(SEXP x, const char *arg) {
+    if (TYPEOF(x) != VECSXP) {
+        Rf_error("%s must be a list of raw vectors or non-missing character scalars", arg);
+    }
+}
+
 static struct RsassySeqViews Rsassy_sequences_view(SEXP x, const char *arg) {
     struct RsassySeqViews views;
     views.data = NULL;
     views.len = NULL;
     views.n = 0;
 
-    if (TYPEOF(x) == RAWSXP) {
-        views.n = 1;
-        views.data = (const uint8_t **)R_alloc(1, sizeof(const uint8_t *));
-        views.len = (uintptr_t *)R_alloc(1, sizeof(uintptr_t));
-        struct RsassySeqView view = Rsassy_sequence_view(x, arg);
-        views.data[0] = view.data;
-        views.len[0] = view.len;
-        return views;
-    }
-
-    if (TYPEOF(x) == STRSXP) {
-        R_xlen_t n = XLENGTH(x);
-        if ((uint64_t)n > (uint64_t)SIZE_MAX) {
-            Rf_error("%s has too many elements for this platform", arg);
-        }
-        views.n = (uintptr_t)n;
-        views.data = (const uint8_t **)R_alloc((size_t)n, sizeof(const uint8_t *));
-        views.len = (uintptr_t *)R_alloc((size_t)n, sizeof(uintptr_t));
-        for (R_xlen_t i = 0; i < n; i++) {
-            if (STRING_ELT(x, i) == NA_STRING) {
-                Rf_error("%s must not contain NA strings", arg);
-            }
-            SEXP ch = STRING_ELT(x, i);
-            R_xlen_t len = XLENGTH(ch);
-            if ((uint64_t)len > (uint64_t)SIZE_MAX) {
-                Rf_error("%s[[%lld]] is too large for this platform", arg, (long long)i + 1);
-            }
-            views.data[i] = len > 0 ? (const uint8_t *)CHAR(ch) : NULL;
-            views.len[i] = (uintptr_t)len;
-        }
-        return views;
-    }
+    Rsassy_assert_sequence_list(x, arg);
 
     if (TYPEOF(x) == VECSXP) {
         R_xlen_t n = XLENGTH(x);
@@ -220,7 +206,7 @@ static struct RsassySeqViews Rsassy_sequences_view(SEXP x, const char *arg) {
         return views;
     }
 
-    Rf_error("%s must be a raw vector, character vector, or list of raw/character scalars", arg);
+    Rf_error("%s must be a list of raw vectors or non-missing character scalars", arg);
     return views;
 }
 
@@ -298,19 +284,64 @@ static int Rsassy_match_compare_input_order(const void *lhs, const void *rhs) {
     return Rsassy_cmp_cstr(a->cigar, b->cigar);
 }
 
-static SEXP Rsassy_matches_data_frame(RsassyMatch *matches, uintptr_t n, bool include_match_region) {
+static int Rsassy_validate_id_vector(SEXP ids, uintptr_t n, const char *arg, const char *unit) {
+    if (ids == R_NilValue) {
+        return 0;
+    }
+    if (TYPEOF(ids) != STRSXP || XLENGTH(ids) != (R_xlen_t)n) {
+        Rf_error("%s must be NULL or a character vector with one entry per %s", arg, unit);
+    }
+    for (R_xlen_t i = 0; i < XLENGTH(ids); i++) {
+        if (STRING_ELT(ids, i) == NA_STRING) {
+            Rf_error("%s must not contain NA values", arg);
+        }
+    }
+    return 1;
+}
+
+static void Rsassy_set_data_frame_attrib(SEXP out, uintptr_t n, int nprotect, int sassy_matches) {
+    SEXP row_names = PROTECT(Rf_allocVector(INTSXP, 2)); nprotect++;
+    INTEGER(row_names)[0] = NA_INTEGER;
+    INTEGER(row_names)[1] = -(int)n;
+    Rf_setAttrib(out, R_RowNamesSymbol, row_names);
+
+    SEXP klass = PROTECT(Rf_allocVector(STRSXP, sassy_matches ? 2 : 1)); nprotect++;
+    if (sassy_matches) {
+        SET_STRING_ELT(klass, 0, Rf_mkChar("sassy_matches"));
+        SET_STRING_ELT(klass, 1, Rf_mkChar("data.frame"));
+    } else {
+        SET_STRING_ELT(klass, 0, Rf_mkChar("data.frame"));
+    }
+    Rf_setAttrib(out, R_ClassSymbol, klass);
+
+    UNPROTECT(nprotect);
+}
+
+static SEXP Rsassy_matches_data_frame(RsassyMatch *matches,
+                                      uintptr_t n,
+                                      bool include_match_region,
+                                      SEXP pattern_id_s,
+                                      uintptr_t n_patterns,
+                                      SEXP text_id_s,
+                                      uintptr_t n_texts) {
     if ((uint64_t)n > (uint64_t)INT_MAX) {
         Rf_error("too many matches to return as an R data frame");
     }
+    int has_pattern_id = Rsassy_validate_id_vector(pattern_id_s, n_patterns, "pattern_id", "pattern");
+    int has_text_id = Rsassy_validate_id_vector(text_id_s, n_texts, "text_id", "text");
     if (n > 1) {
         qsort(matches, (size_t)n, sizeof(RsassyMatch), Rsassy_match_compare_input_order);
     }
 
-    int ncol = include_match_region ? 10 : 9;
+    int ncol = 9 + (include_match_region ? 1 : 0) + has_pattern_id + has_text_id;
     int nprotect = 0;
     R_xlen_t rn = (R_xlen_t)n;
     SEXP pattern_idx = PROTECT(Rf_allocVector(INTSXP, rn)); nprotect++;
+    SEXP pattern_id = has_pattern_id ? PROTECT(Rf_allocVector(STRSXP, rn)) : R_NilValue;
+    if (has_pattern_id) nprotect++;
     SEXP text_idx = PROTECT(Rf_allocVector(INTSXP, rn)); nprotect++;
+    SEXP text_id = has_text_id ? PROTECT(Rf_allocVector(STRSXP, rn)) : R_NilValue;
+    if (has_text_id) nprotect++;
     SEXP text_start = PROTECT(Rf_allocVector(REALSXP, rn)); nprotect++;
     SEXP text_end = PROTECT(Rf_allocVector(REALSXP, rn)); nprotect++;
     SEXP pattern_start = PROTECT(Rf_allocVector(REALSXP, rn)); nprotect++;
@@ -328,8 +359,17 @@ static SEXP Rsassy_matches_data_frame(RsassyMatch *matches, uintptr_t n, bool in
             (uint64_t)matches[i].text_idx > (uint64_t)INT_MAX) {
             Rf_error("pattern_idx/text_idx are too large to return as R integers");
         }
+        if (matches[i].pattern_idx >= n_patterns || matches[i].text_idx >= n_texts) {
+            Rf_error("match pattern_idx/text_idx are outside input bounds");
+        }
         INTEGER(pattern_idx)[i] = (int)matches[i].pattern_idx;
+        if (has_pattern_id) {
+            SET_STRING_ELT(pattern_id, i, STRING_ELT(pattern_id_s, (R_xlen_t)matches[i].pattern_idx));
+        }
         INTEGER(text_idx)[i] = (int)matches[i].text_idx;
+        if (has_text_id) {
+            SET_STRING_ELT(text_id, i, STRING_ELT(text_id_s, (R_xlen_t)matches[i].text_idx));
+        }
         REAL(text_start)[i] = (double)matches[i].text_start;
         REAL(text_end)[i] = (double)matches[i].text_end;
         REAL(pattern_start)[i] = (double)matches[i].pattern_start;
@@ -347,45 +387,106 @@ static SEXP Rsassy_matches_data_frame(RsassyMatch *matches, uintptr_t n, bool in
     }
 
     SEXP out = PROTECT(Rf_allocVector(VECSXP, ncol)); nprotect++;
-    SET_VECTOR_ELT(out, 0, pattern_idx);
-    SET_VECTOR_ELT(out, 1, text_idx);
-    SET_VECTOR_ELT(out, 2, text_start);
-    SET_VECTOR_ELT(out, 3, text_end);
-    SET_VECTOR_ELT(out, 4, pattern_start);
-    SET_VECTOR_ELT(out, 5, pattern_end);
-    SET_VECTOR_ELT(out, 6, cost);
-    SET_VECTOR_ELT(out, 7, strand);
-    SET_VECTOR_ELT(out, 8, cigar);
-    if (include_match_region) {
-        SET_VECTOR_ELT(out, 9, match_region);
-    }
-
     SEXP names = PROTECT(Rf_allocVector(STRSXP, ncol)); nprotect++;
-    SET_STRING_ELT(names, 0, Rf_mkChar("pattern_idx"));
-    SET_STRING_ELT(names, 1, Rf_mkChar("text_idx"));
-    SET_STRING_ELT(names, 2, Rf_mkChar("text_start"));
-    SET_STRING_ELT(names, 3, Rf_mkChar("text_end"));
-    SET_STRING_ELT(names, 4, Rf_mkChar("pattern_start"));
-    SET_STRING_ELT(names, 5, Rf_mkChar("pattern_end"));
-    SET_STRING_ELT(names, 6, Rf_mkChar("cost"));
-    SET_STRING_ELT(names, 7, Rf_mkChar("strand"));
-    SET_STRING_ELT(names, 8, Rf_mkChar("cigar"));
-    if (include_match_region) {
-        SET_STRING_ELT(names, 9, Rf_mkChar("match_region"));
-    }
+    int col = 0;
+#define RSASSY_SET_COL(name, value) do { \
+        SET_VECTOR_ELT(out, col, value); \
+        SET_STRING_ELT(names, col, Rf_mkChar(name)); \
+        col++; \
+    } while (0)
+    RSASSY_SET_COL("pattern_idx", pattern_idx);
+    if (has_pattern_id) RSASSY_SET_COL("pattern_id", pattern_id);
+    RSASSY_SET_COL("text_idx", text_idx);
+    if (has_text_id) RSASSY_SET_COL("text_id", text_id);
+    RSASSY_SET_COL("text_start", text_start);
+    RSASSY_SET_COL("text_end", text_end);
+    RSASSY_SET_COL("pattern_start", pattern_start);
+    RSASSY_SET_COL("pattern_end", pattern_end);
+    RSASSY_SET_COL("cost", cost);
+    RSASSY_SET_COL("strand", strand);
+    RSASSY_SET_COL("cigar", cigar);
+    if (include_match_region) RSASSY_SET_COL("match_region", match_region);
+#undef RSASSY_SET_COL
     Rf_setAttrib(out, R_NamesSymbol, names);
+    Rsassy_set_data_frame_attrib(out, n, nprotect, 1);
+    return out;
+}
 
-    SEXP row_names = PROTECT(Rf_allocVector(INTSXP, 2)); nprotect++;
-    INTEGER(row_names)[0] = NA_INTEGER;
-    INTEGER(row_names)[1] = -(int)n;
-    Rf_setAttrib(out, R_RowNamesSymbol, row_names);
+static SEXP Rsassy_crispr_data_frame(RsassyMatch *matches,
+                                     uintptr_t n,
+                                     const struct RsassySeqViews *guides,
+                                     SEXP pattern_id_s,
+                                     const struct RsassySeqViews *texts,
+                                     SEXP text_id_s) {
+    if ((uint64_t)n > (uint64_t)INT_MAX) {
+        Rf_error("too many matches to return as an R data frame");
+    }
+    int has_pattern_id = Rsassy_validate_id_vector(pattern_id_s, guides->n, "pattern_id", "guide");
+    int has_text_id = Rsassy_validate_id_vector(text_id_s, texts->n, "text_id", "text");
+    if (n > 1) {
+        qsort(matches, (size_t)n, sizeof(RsassyMatch), Rsassy_match_compare_input_order);
+    }
 
-    SEXP klass = PROTECT(Rf_allocVector(STRSXP, 2)); nprotect++;
-    SET_STRING_ELT(klass, 0, Rf_mkChar("sassy_matches"));
-    SET_STRING_ELT(klass, 1, Rf_mkChar("data.frame"));
-    Rf_setAttrib(out, R_ClassSymbol, klass);
+    int ncol = 7 + has_pattern_id + has_text_id;
+    int nprotect = 0;
+    R_xlen_t rn = (R_xlen_t)n;
+    SEXP pattern_id = has_pattern_id ? PROTECT(Rf_allocVector(STRSXP, rn)) : R_NilValue;
+    if (has_pattern_id) nprotect++;
+    SEXP guide = PROTECT(Rf_allocVector(STRSXP, rn)); nprotect++;
+    SEXP text_id = has_text_id ? PROTECT(Rf_allocVector(STRSXP, rn)) : R_NilValue;
+    if (has_text_id) nprotect++;
+    SEXP cost = PROTECT(Rf_allocVector(INTSXP, rn)); nprotect++;
+    SEXP strand = PROTECT(Rf_allocVector(STRSXP, rn)); nprotect++;
+    SEXP start = PROTECT(Rf_allocVector(REALSXP, rn)); nprotect++;
+    SEXP end = PROTECT(Rf_allocVector(REALSXP, rn)); nprotect++;
+    SEXP match_region = PROTECT(Rf_allocVector(STRSXP, rn)); nprotect++;
+    SEXP cigar = PROTECT(Rf_allocVector(STRSXP, rn)); nprotect++;
 
-    UNPROTECT(nprotect);
+    for (R_xlen_t i = 0; i < rn; i++) {
+        if (matches[i].pattern_idx >= guides->n || matches[i].text_idx >= texts->n) {
+            Rf_error("match pattern_idx/text_idx are outside input bounds");
+        }
+        if (has_pattern_id) {
+            SET_STRING_ELT(pattern_id, i, STRING_ELT(pattern_id_s, (R_xlen_t)matches[i].pattern_idx));
+        }
+        if ((uint64_t)guides->len[matches[i].pattern_idx] > (uint64_t)INT_MAX ||
+            (uint64_t)matches[i].match_region_len > (uint64_t)INT_MAX) {
+            Rf_error("guide or match_region is too large to return as an R string");
+        }
+        SET_STRING_ELT(guide, i, Rf_mkCharLenCE((const char *)guides->data[matches[i].pattern_idx],
+                                                (int)guides->len[matches[i].pattern_idx], CE_BYTES));
+        if (has_text_id) {
+            SET_STRING_ELT(text_id, i, STRING_ELT(text_id_s, (R_xlen_t)matches[i].text_idx));
+        }
+        INTEGER(cost)[i] = (int)matches[i].cost;
+        SET_STRING_ELT(strand, i, Rf_mkChar(matches[i].strand == 0 ? "+" : "-"));
+        REAL(start)[i] = (double)matches[i].text_start;
+        REAL(end)[i] = (double)matches[i].text_end;
+        const char *region = matches[i].match_region == NULL ? "" : matches[i].match_region;
+        SET_STRING_ELT(match_region, i, Rf_mkCharLenCE(region, (int)matches[i].match_region_len, CE_BYTES));
+        SET_STRING_ELT(cigar, i, Rf_mkChar(matches[i].cigar == NULL ? "" : matches[i].cigar));
+    }
+
+    SEXP out = PROTECT(Rf_allocVector(VECSXP, ncol)); nprotect++;
+    SEXP names = PROTECT(Rf_allocVector(STRSXP, ncol)); nprotect++;
+    int col = 0;
+#define RSASSY_SET_COL(name, value) do { \
+        SET_VECTOR_ELT(out, col, value); \
+        SET_STRING_ELT(names, col, Rf_mkChar(name)); \
+        col++; \
+    } while (0)
+    if (has_pattern_id) RSASSY_SET_COL("pattern_id", pattern_id);
+    RSASSY_SET_COL("guide", guide);
+    if (has_text_id) RSASSY_SET_COL("text_id", text_id);
+    RSASSY_SET_COL("cost", cost);
+    RSASSY_SET_COL("strand", strand);
+    RSASSY_SET_COL("start", start);
+    RSASSY_SET_COL("end", end);
+    RSASSY_SET_COL("match_region", match_region);
+    RSASSY_SET_COL("cigar", cigar);
+#undef RSASSY_SET_COL
+    Rf_setAttrib(out, R_NamesSymbol, names);
+    Rsassy_set_data_frame_attrib(out, n, nprotect, 0);
     return out;
 }
 
@@ -396,7 +497,9 @@ SEXP RC_sassy_searcher_search(SEXP searcher_s,
                               SEXP all_s,
                               SEXP threads_s,
                               SEXP strategy_s,
-                              SEXP match_region_s) {
+                              SEXP match_region_s,
+                              SEXP pattern_id_s,
+                              SEXP text_id_s) {
     Rsassy_init_backend();
     RsassySearcher *searcher = Rsassy_searcher_from_xptr(searcher_s);
 
@@ -444,7 +547,63 @@ SEXP RC_sassy_searcher_search(SEXP searcher_s,
         }
     }
 
-    SEXP out = Rsassy_matches_data_frame(matches, n_matches, include_match_region == TRUE);
+    SEXP out = Rsassy_matches_data_frame(matches,
+                                         n_matches,
+                                         include_match_region == TRUE,
+                                         pattern_id_s,
+                                         patterns.n,
+                                         text_id_s,
+                                         texts.n);
+    rsassy_matches_free(matches, n_matches);
+    return out;
+}
+
+SEXP RC_sassy_crispr(SEXP guide_s,
+                     SEXP text_s,
+                     SEXP k_s,
+                     SEXP pam_length_s,
+                     SEXP allow_pam_edits_s,
+                     SEXP max_n_frac_s,
+                     SEXP rc_s,
+                     SEXP threads_s,
+                     SEXP pattern_id_s,
+                     SEXP text_id_s) {
+    Rsassy_init_backend();
+    struct RsassySeqViews guides = Rsassy_sequences_view(guide_s, "guide");
+    struct RsassySeqViews texts = Rsassy_sequences_view(text_s, "text");
+
+    uintptr_t k = Rsassy_uintptr_scalar(k_s, "k", 0);
+    uintptr_t pam_length = Rsassy_uintptr_scalar(pam_length_s, "pam_length", 1);
+    int allow_pam_edits = Rsassy_logical_scalar(allow_pam_edits_s, "allow_pam_edits");
+    double max_n_frac = Rsassy_fraction_scalar(max_n_frac_s, "max_n_frac");
+    int rc = Rsassy_logical_scalar(rc_s, "rc");
+    uintptr_t threads = Rsassy_uintptr_scalar(threads_s, "threads", 1);
+
+    RsassyMatch *matches = NULL;
+    uintptr_t n_matches = 0;
+    if (rsassy_crispr_search_many(guides.data,
+                                  guides.len,
+                                  guides.n,
+                                  texts.data,
+                                  texts.len,
+                                  texts.n,
+                                  k,
+                                  pam_length,
+                                  allow_pam_edits == TRUE,
+                                  (float)max_n_frac,
+                                  rc == TRUE,
+                                  threads,
+                                  &matches,
+                                  &n_matches) != 0) {
+        Rsassy_stop_last_error();
+    }
+
+    SEXP out = Rsassy_crispr_data_frame(matches,
+                                        n_matches,
+                                        &guides,
+                                        pattern_id_s,
+                                        &texts,
+                                        text_id_s);
     rsassy_matches_free(matches, n_matches);
     return out;
 }
@@ -621,7 +780,8 @@ static const R_CallMethodDef CallEntries[] = {
     {"RC_sassy_features", (DL_FUNC)&RC_sassy_features, 0},
     {"RC_sassy_set_backend", (DL_FUNC)&RC_sassy_set_backend, 1},
     {"RC_sassy_searcher_new", (DL_FUNC)&RC_sassy_searcher_new, 3},
-    {"RC_sassy_searcher_search", (DL_FUNC)&RC_sassy_searcher_search, 8},
+    {"RC_sassy_searcher_search", (DL_FUNC)&RC_sassy_searcher_search, 10},
+    {"RC_sassy_crispr", (DL_FUNC)&RC_sassy_crispr, 10},
     {NULL, NULL, 0}
 };
 

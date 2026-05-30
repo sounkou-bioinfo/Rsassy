@@ -50,6 +50,7 @@ Rsassy_searcher_new_fn Rsassy_rsassy_searcher_new = NULL;
 Rsassy_searcher_free_fn Rsassy_rsassy_searcher_free = NULL;
 Rsassy_searcher_search_fn Rsassy_rsassy_searcher_search = NULL;
 Rsassy_searcher_search_many_fn Rsassy_rsassy_searcher_search_many = NULL;
+Rsassy_crispr_search_many_fn Rsassy_rsassy_crispr_search_many = NULL;
 Rsassy_matches_free_fn Rsassy_rsassy_matches_free = NULL;
 Rsassy_last_error_message_fn Rsassy_rsassy_last_error_message = NULL;
 Rsassy_features_string_fn Rsassy_rsassy_features_string = NULL;
@@ -573,6 +574,7 @@ static int Rsassy_try_load_backend(const char *dir, const char *backend, char *e
     Rsassy_rsassy_searcher_free = (Rsassy_searcher_free_fn)Rsassy_load_symbol(handle, "rsassy_searcher_free");
     Rsassy_rsassy_searcher_search = (Rsassy_searcher_search_fn)Rsassy_load_symbol(handle, "rsassy_searcher_search");
     Rsassy_rsassy_searcher_search_many = (Rsassy_searcher_search_many_fn)Rsassy_load_symbol(handle, "rsassy_searcher_search_many");
+    Rsassy_rsassy_crispr_search_many = (Rsassy_crispr_search_many_fn)Rsassy_load_symbol(handle, "rsassy_crispr_search_many");
     Rsassy_rsassy_matches_free = (Rsassy_matches_free_fn)Rsassy_load_symbol(handle, "rsassy_matches_free");
     Rsassy_rsassy_last_error_message = (Rsassy_last_error_message_fn)Rsassy_load_symbol(handle, "rsassy_last_error_message");
     Rsassy_rsassy_features_string = (Rsassy_features_string_fn)Rsassy_load_symbol(handle, "rsassy_features_string");

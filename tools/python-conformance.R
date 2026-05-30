@@ -79,26 +79,26 @@ expect_same <- function(label, r_matches, py_matches) {
 # One-off searches.
 expect_same(
   "dna forward search",
-  sassy_search("ACGT", "TTACGTAA", 0, alphabet = "dna", rc = FALSE),
+  sassy_search(list("ACGT"), list("TTACGTAA"), 0, alphabet = "dna", rc = FALSE),
   py_sassy$Searcher("dna", rc = FALSE)$search(py_bytes("ACGT"), py_bytes("TTACGTAA"), 0L)
 )
 
 expect_same(
   "dna reverse-complement search",
-  sassy_search("ATCGATCG", "GGGGATCGATCGTTTT", 1, alphabet = "dna", rc = TRUE),
+  sassy_search(list("ATCGATCG"), list("GGGGATCGATCGTTTT"), 1, alphabet = "dna", rc = TRUE),
   py_sassy$Searcher("dna", rc = TRUE)$search(py_bytes("ATCGATCG"), py_bytes("GGGGATCGATCGTTTT"), 1L)
 )
 
 expect_same(
   "ascii search",
-  sassy_search("hello", "world hello there", 0, alphabet = "ascii"),
+  sassy_search(list("hello"), list("world hello there"), 0, alphabet = "ascii"),
   py_sassy$Searcher("ascii")$search(py_bytes("hello"), py_bytes("world hello there"), 0L)
 )
 
 # All end positions.
 expect_same(
   "search_all",
-  sassy_search("ATCGATCG", "GGGGATCGATCGTTTT", 2, alphabet = "dna", rc = FALSE, all = TRUE),
+  sassy_search(list("ATCGATCG"), list("GGGGATCGATCGTTTT"), 2, alphabet = "dna", rc = FALSE, all = TRUE),
   py_sassy$Searcher("dna", rc = FALSE)$search_all(py_bytes("ATCGATCG"), py_bytes("GGGGATCGATCGTTTT"), 2L)
 )
 
@@ -107,7 +107,7 @@ patterns <- c("hello", "world")
 texts <- c("hello world", "the world wide web")
 expect_same(
   "search_many pairwise",
-  sassy_search(patterns, texts, 0, alphabet = "ascii", strategy = "pairwise", threads = 2L),
+  sassy_search(as.list(patterns), as.list(texts), 0, alphabet = "ascii", strategy = "pairwise", threads = 2L),
   py_sassy$Searcher("ascii")$search_many(
     lapply(patterns, py_bytes),
     lapply(texts, py_bytes),

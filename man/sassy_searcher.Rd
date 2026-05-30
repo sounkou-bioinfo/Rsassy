@@ -23,5 +23,5 @@ same settings.
 }
 \examples{
 searcher <- sassy_searcher("dna", rc = FALSE)
-sassy_searcher_search(searcher, "ACGT", "TTACGTAA", 0)
+sassy_searcher_search(searcher, list("ACGT"), list("TTACGTAA"), 0)
 }

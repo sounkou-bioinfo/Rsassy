@@ -123,7 +123,7 @@ stopifnot(identical(f$rsassy_supported_backends, "wasm_simd128"))
 stopifnot(identical(f$target_arch, "wasm32"))
 stopifnot(identical(f$target_os, "emscripten"))
 stopifnot(isTRUE(f$selected_compiled_wasm_simd128))
-m <- sassy_search("ATCGATCG", "GGGGATCGATCGTTTT", 1, alphabet = "dna")
+m <- sassy_search(list("ATCGATCG"), list("GGGGATCGATCGTTTT"), 1, alphabet = "dna")
 print(m)
 stopifnot(nrow(m) == 3L)
 `, { withAutoprint: false });

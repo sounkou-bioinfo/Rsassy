@@ -1,13 +1,17 @@
 mod backend;
 mod search_many;
 
+#[cfg(not(target_arch = "wasm32"))]
+use rayon::prelude::*;
+#[cfg(not(target_arch = "wasm32"))]
+use rayon::ThreadPoolBuilder;
 use sassy::profiles::{Ascii, Dna, Iupac, Profile};
 use sassy::{Match as SassyMatch, Searcher, Strand};
 use search_many::{parse_search_strategy, search_many, validate_strategy_for_profile};
 use std::cell::RefCell;
 use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_int};
-use std::panic::{AssertUnwindSafe, catch_unwind};
+use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::ptr;
 use std::slice;
 
@@ -265,6 +269,220 @@ fn write_match_array<P: Profile>(
     Ok(())
 }
 
+fn iupac_match_slices(query: &[u8], target: &[u8]) -> bool {
+    query.len() == target.len()
+        && query
+            .iter()
+            .zip(target.iter())
+            .all(|(q, t)| Iupac::is_match(*q, *t))
+}
+
+fn n_fraction_ok(max_n_frac: f32, slice: &[u8]) -> bool {
+    if slice.is_empty() {
+        return true;
+    }
+    let n_count = slice.iter().filter(|c| (**c & 0xDF) == b'N').count() as f32;
+    n_count / slice.len() as f32 <= max_n_frac
+}
+
+fn crispr_common_pam(guides: &[&[u8]], pam_length: usize) -> Result<Vec<u8>, String> {
+    if guides.is_empty() {
+        return Err("guide must contain at least one sequence".to_string());
+    }
+    if pam_length == 0 {
+        return Err("pam_length must be >= 1".to_string());
+    }
+    let first = guides[0];
+    if first.len() < pam_length {
+        return Err("all guide sequences must be at least pam_length bytes long".to_string());
+    }
+    let pam = &first[first.len() - pam_length..];
+    for guide in guides {
+        if guide.len() < pam_length {
+            return Err("all guide sequences must be at least pam_length bytes long".to_string());
+        }
+        if &guide[guide.len() - pam_length..] != pam {
+            return Err("all guide sequences must have the same PAM suffix".to_string());
+        }
+    }
+    Ok(pam.to_vec())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn crispr_search_pair(
+    searcher: &mut Searcher<Iupac>,
+    guide: &[u8],
+    text: &[u8],
+    k: usize,
+    pam_length: usize,
+    pam: &[u8],
+    pam_complement: &[u8],
+    allow_pam_edits: bool,
+    max_n_frac: f32,
+    pattern_idx: usize,
+    text_idx: usize,
+) -> Vec<SassyMatch> {
+    let mut matches = if allow_pam_edits {
+        searcher.search_all(guide, text, k)
+    } else {
+        searcher.search_with_fn(guide, text, k, true, |_, text_up_to_end, strand| {
+            if text_up_to_end.len() < pam_length {
+                return false;
+            }
+            let pam_slice = &text_up_to_end[text_up_to_end.len() - pam_length..];
+            if strand == Strand::Fwd {
+                iupac_match_slices(pam_slice, pam)
+            } else {
+                iupac_match_slices(pam_slice, pam_complement)
+            }
+        })
+    };
+
+    matches.retain(|m| {
+        m.text_start <= m.text_end
+            && m.text_end <= text.len()
+            && n_fraction_ok(max_n_frac, &text[m.text_start..m.text_end])
+    });
+    for m in &mut matches {
+        m.pattern_idx = pattern_idx;
+        m.text_idx = text_idx;
+    }
+    matches
+}
+
+#[allow(clippy::too_many_arguments)]
+fn crispr_search_many_serial(
+    guides: &[&[u8]],
+    texts: &[&[u8]],
+    k: usize,
+    pam_length: usize,
+    pam: &[u8],
+    pam_complement: &[u8],
+    allow_pam_edits: bool,
+    max_n_frac: f32,
+    rc: bool,
+) -> Vec<SassyMatch> {
+    let mut searcher = Searcher::<Iupac>::new(rc, None);
+    let mut out = Vec::new();
+    for (text_idx, text) in texts.iter().enumerate() {
+        for (pattern_idx, guide) in guides.iter().enumerate() {
+            out.extend(crispr_search_pair(
+                &mut searcher,
+                guide,
+                text,
+                k,
+                pam_length,
+                pam,
+                pam_complement,
+                allow_pam_edits,
+                max_n_frac,
+                pattern_idx,
+                text_idx,
+            ));
+        }
+    }
+    out
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+#[allow(clippy::too_many_arguments)]
+fn crispr_search_many_parallel(
+    guides: &[&[u8]],
+    texts: &[&[u8]],
+    k: usize,
+    pam_length: usize,
+    pam: &[u8],
+    pam_complement: &[u8],
+    allow_pam_edits: bool,
+    max_n_frac: f32,
+    rc: bool,
+) -> Vec<SassyMatch> {
+    const TASKS_PER_CHUNK: usize = 64;
+    let n_guides = guides.len();
+    let n_pairs = n_guides * texts.len();
+    let mut chunks: Vec<(usize, Vec<SassyMatch>)> = (0..n_pairs)
+        .into_par_iter()
+        .chunks(TASKS_PER_CHUNK)
+        .enumerate()
+        .map(|(chunk_idx, pairs)| {
+            let mut searcher = Searcher::<Iupac>::new(rc, None);
+            let mut out = Vec::new();
+            for pair_idx in pairs {
+                let text_idx = pair_idx / n_guides;
+                let pattern_idx = pair_idx % n_guides;
+                out.extend(crispr_search_pair(
+                    &mut searcher,
+                    guides[pattern_idx],
+                    texts[text_idx],
+                    k,
+                    pam_length,
+                    pam,
+                    pam_complement,
+                    allow_pam_edits,
+                    max_n_frac,
+                    pattern_idx,
+                    text_idx,
+                ));
+            }
+            (chunk_idx, out)
+        })
+        .collect();
+    chunks.sort_by_key(|(chunk_idx, _)| *chunk_idx);
+    chunks
+        .into_iter()
+        .flat_map(|(_, matches)| matches)
+        .collect()
+}
+
+#[allow(clippy::too_many_arguments)]
+fn crispr_search_many(
+    guides: &[&[u8]],
+    texts: &[&[u8]],
+    k: usize,
+    pam_length: usize,
+    pam: &[u8],
+    pam_complement: &[u8],
+    allow_pam_edits: bool,
+    max_n_frac: f32,
+    rc: bool,
+    threads: usize,
+) -> Vec<SassyMatch> {
+    if guides.is_empty() || texts.is_empty() {
+        return Vec::new();
+    }
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        if threads > 1 {
+            if let Ok(pool) = ThreadPoolBuilder::new().num_threads(threads).build() {
+                return pool.install(|| {
+                    crispr_search_many_parallel(
+                        guides,
+                        texts,
+                        k,
+                        pam_length,
+                        pam,
+                        pam_complement,
+                        allow_pam_edits,
+                        max_n_frac,
+                        rc,
+                    )
+                });
+            }
+        }
+    }
+    crispr_search_many_serial(
+        guides,
+        texts,
+        k,
+        pam_length,
+        pam,
+        pam_complement,
+        allow_pam_edits,
+        max_n_frac,
+        rc,
+    )
+}
+
 #[no_mangle]
 pub extern "C" fn rsassy_searcher_new(
     alphabet: *const c_char,
@@ -422,8 +640,15 @@ pub extern "C" fn rsassy_searcher_search_many(
         match &mut searcher.inner {
             SearcherType::Ascii(searcher) => {
                 validate_strategy_for_profile("ascii", strategy)?;
-                let matches =
-                    search_many(searcher, &patterns, &texts, k, all_matches, threads, strategy)?;
+                let matches = search_many(
+                    searcher,
+                    &patterns,
+                    &texts,
+                    k,
+                    all_matches,
+                    threads,
+                    strategy,
+                )?;
                 write_match_array::<Ascii>(
                     matches,
                     &texts,
@@ -434,8 +659,15 @@ pub extern "C" fn rsassy_searcher_search_many(
             }
             SearcherType::Dna(searcher) => {
                 validate_strategy_for_profile("dna", strategy)?;
-                let matches =
-                    search_many(searcher, &patterns, &texts, k, all_matches, threads, strategy)?;
+                let matches = search_many(
+                    searcher,
+                    &patterns,
+                    &texts,
+                    k,
+                    all_matches,
+                    threads,
+                    strategy,
+                )?;
                 write_match_array::<Dna>(
                     matches,
                     &texts,
@@ -446,8 +678,15 @@ pub extern "C" fn rsassy_searcher_search_many(
             }
             SearcherType::Iupac(searcher) => {
                 validate_strategy_for_profile("iupac", strategy)?;
-                let matches =
-                    search_many(searcher, &patterns, &texts, k, all_matches, threads, strategy)?;
+                let matches = search_many(
+                    searcher,
+                    &patterns,
+                    &texts,
+                    k,
+                    all_matches,
+                    threads,
+                    strategy,
+                )?;
                 write_match_array::<Iupac>(
                     matches,
                     &texts,
@@ -457,6 +696,47 @@ pub extern "C" fn rsassy_searcher_search_many(
                 )
             }
         }
+    })
+}
+
+#[no_mangle]
+pub extern "C" fn rsassy_crispr_search_many(
+    guides: *const *const u8,
+    guide_lens: *const usize,
+    n_guides: usize,
+    texts: *const *const u8,
+    text_lens: *const usize,
+    n_texts: usize,
+    k: usize,
+    pam_length: usize,
+    allow_pam_edits: bool,
+    max_n_frac: f32,
+    rc: bool,
+    threads: usize,
+    out_matches: *mut *mut RsassyMatch,
+    out_len: *mut usize,
+) -> c_int {
+    guard_ffi(|| {
+        let guides = unsafe { byte_slices_from_raw_arrays(guides, guide_lens, n_guides, "guide")? };
+        let texts = unsafe { byte_slices_from_raw_arrays(texts, text_lens, n_texts, "text")? };
+        if !max_n_frac.is_finite() || !(0.0..=1.0).contains(&max_n_frac) {
+            return Err("max_n_frac must be a number in [0, 1]".to_string());
+        }
+        let pam = crispr_common_pam(&guides, pam_length)?;
+        let pam_complement = Iupac::complement(&pam);
+        let matches = crispr_search_many(
+            &guides,
+            &texts,
+            k,
+            pam_length,
+            &pam,
+            &pam_complement,
+            allow_pam_edits,
+            max_n_frac,
+            rc,
+            threads.max(1),
+        );
+        write_match_array::<Iupac>(matches, &texts, true, out_matches, out_len)
     })
 }
 

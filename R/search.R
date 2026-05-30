@@ -103,7 +103,7 @@ sassy_set_backend <- function(backend = c("auto", "scalar", "avx2", "avx512", "n
 #' @return An external pointer with class `sassy_searcher`.
 #' @examples
 #' searcher <- sassy_searcher("dna", rc = FALSE)
-#' sassy_searcher_search(searcher, "ACGT", "TTACGTAA", 0)
+#' sassy_searcher_search(searcher, list("ACGT"), list("TTACGTAA"), 0)
 #' @export
 sassy_searcher <- function(alphabet = "dna", rc = TRUE, alpha = NULL) {
   .Call("RC_sassy_searcher_new", alphabet, rc, alpha, PACKAGE = "Rsassy")
@@ -111,14 +111,20 @@ sassy_searcher <- function(alphabet = "dna", rc = TRUE, alpha = NULL) {
 
 #' Search with a reusable 'sassy' searcher
 #'
-#' `pattern` and `text` may be single sequences or vectors/lists of sequences.
-#' When vectors are supplied, every pattern is searched against every text and
-#' the returned `pattern_idx` and `text_idx` columns identify the 0-based input
-#' indices. Use `threads > 1` for larger batches.
+#' `pattern` and `text` must be lists of sequences. Each element must be a raw
+#' vector or a non-missing character scalar. Every pattern is searched against
+#' every text and the returned `pattern_idx` and `text_idx` columns identify the
+#' 0-based input indices. Use `threads > 1` for larger batches.
 #'
 #' @param searcher A searcher created by [sassy_searcher()].
-#' @param pattern Raw vector, character vector, or list of raw vectors / character scalars.
-#' @param text Raw vector, character vector, or list of raw vectors / character scalars.
+#' @param pattern List of raw vectors or non-missing character scalars.
+#' @param text List of raw vectors or non-missing character scalars.
+#' @param pattern_id Optional pattern identifiers. If supplied, must be a
+#'   non-missing character vector with one entry per pattern and adds/replaces a
+#'   `pattern_id` column. Names on `pattern` are not inspected.
+#' @param text_id Optional text identifiers. If supplied, must be a non-missing
+#'   character vector with one entry per text and adds/replaces a `text_id`
+#'   column. Names on `text` are not inspected.
 #' @param k Maximum edit distance.
 #' @param all If `FALSE`, return the usual local-minimum matches. If `TRUE`,
 #'   return every end position with score <= `k`; this can include overlapping
@@ -134,7 +140,7 @@ sassy_searcher <- function(alphabet = "dna", rc = TRUE, alpha = NULL) {
 #'   pattern direction.
 #' @param sam If `TRUE`, format reverse-strand `match_region` and `cigar` in the
 #'   text direction used by SAM and by the upstream `sassy --sam` output.
-#' @return A data frame with 0-based indices and coordinates: `pattern_idx`, `text_idx`, `text_start`, `text_end`, `pattern_start`, `pattern_end`, `cost`, `strand`, and `cigar`. If requested, also includes `match_region`. Rows are ordered by input text, then text start/end coordinate, then pattern index.
+#' @return A data frame with 0-based indices and coordinates: `pattern_idx`, `text_idx`, `text_start`, `text_end`, `pattern_start`, `pattern_end`, `cost`, `strand`, and `cigar`. If `pattern_id` or `text_id` are supplied, mapped identifier columns are included. If requested, also includes `match_region`. Rows are ordered by input text, then text start/end coordinate, then pattern index.
 #' @export
 sassy_searcher_search <- function(searcher,
                                   pattern,
@@ -143,6 +149,8 @@ sassy_searcher_search <- function(searcher,
                                   all = FALSE,
                                   threads = 1L,
                                   strategy = "pairwise",
+                                  pattern_id = NULL,
+                                  text_id = NULL,
                                   match_region = FALSE,
                                   sam = FALSE) {
   strategy <- sassy_strategy_scalar(strategy)
@@ -159,6 +167,8 @@ sassy_searcher_search <- function(searcher,
     threads,
     strategy,
     match_region,
+    pattern_id,
+    text_id,
     PACKAGE = "Rsassy"
   )
   if (sam) {
@@ -174,9 +184,9 @@ sassy_searcher_search <- function(searcher,
 #'
 #' @inheritParams sassy_searcher
 #' @inheritParams sassy_searcher_search
-#' @return A data frame with 0-based indices and coordinates: `pattern_idx`, `text_idx`, `text_start`, `text_end`, `pattern_start`, `pattern_end`, `cost`, `strand`, and `cigar`. If requested, also includes `match_region`. Rows are ordered by input text, then text start/end coordinate, then pattern index.
+#' @return A data frame with 0-based indices and coordinates: `pattern_idx`, `text_idx`, `text_start`, `text_end`, `pattern_start`, `pattern_end`, `cost`, `strand`, and `cigar`. If `pattern_id` or `text_id` are supplied, mapped identifier columns are included. If requested, also includes `match_region`. Rows are ordered by input text, then text start/end coordinate, then pattern index.
 #' @examples
-#' sassy_search("ACGT", "TTACGTAA", 0, alphabet = "dna", rc = FALSE)
+#' sassy_search(list("ACGT"), list("TTACGTAA"), 0, alphabet = "dna", rc = FALSE)
 #' @export
 sassy_search <- function(pattern,
                          text,
@@ -187,6 +197,8 @@ sassy_search <- function(pattern,
                          all = FALSE,
                          threads = 1L,
                          strategy = "pairwise",
+                         pattern_id = NULL,
+                         text_id = NULL,
                          match_region = FALSE,
                          sam = FALSE) {
   searcher <- sassy_searcher(alphabet = alphabet, rc = rc, alpha = alpha)
@@ -198,6 +210,8 @@ sassy_search <- function(pattern,
     all = all,
     threads = threads,
     strategy = strategy,
+    pattern_id = pattern_id,
+    text_id = text_id,
     match_region = match_region,
     sam = sam
   )
@@ -218,7 +232,7 @@ sassy_search <- function(pattern,
 #'   text direction.
 #' @examples
 #' sassy_as_sam(
-#'   sassy_search("ACGA", "TTTCGTTT", 0, alphabet = "dna", match_region = TRUE),
+#'   sassy_search(list("ACGA"), list("TTTCGTTT"), 0, alphabet = "dna", match_region = TRUE),
 #'   alphabet = "dna"
 #' )
 #' @export
@@ -254,9 +268,10 @@ sassy_as_sam <- function(x, alphabet = "dna") {
 #' default, the PAM must match exactly under IUPAC matching, while the rest of
 #' the guide may have up to `k` edits.
 #'
-#' @param guide Character vector of guide sequences including the PAM suffix.
-#' @param text Text sequences to search; a character vector, raw vector, or list
-#'   of raw/character scalars accepted by [sassy_search()].
+#' @param guide List of guide sequences including the PAM suffix. Each element
+#'   must be a raw vector or non-missing character scalar.
+#' @param text List of text sequences to search. Each element must be a raw
+#'   vector or non-missing character scalar.
 #' @param k Maximum edit distance for the searched guide sequence. With
 #'   `allow_pam_edits = FALSE`, the exact-PAM filter means this is effectively
 #'   the edit threshold outside the PAM.
@@ -265,12 +280,17 @@ sassy_as_sam <- function(x, alphabet = "dna") {
 #' @param max_n_frac Maximum allowed fraction of `N` bases in `match_region`.
 #' @param rc If `TRUE`, search reverse-complement targets as well.
 #' @param threads Number of worker threads to request.
-#' @param text_id Optional text identifiers. Defaults to names on `text` when
-#'   all names are non-empty, otherwise `text_1`, `text_2`, ...
-#' @return A data frame with CLI-style columns: `guide`, `text_id`, `cost`,
-#'   `strand`, `start`, `end`, `match_region`, and `cigar`.
+#' @param pattern_id Optional guide/pattern identifiers. If supplied, must be a
+#'   character vector with one entry per guide and adds/replaces a `pattern_id`
+#'   column. Names on `guide` are not inspected.
+#' @param text_id Optional text identifiers. If supplied, must be a character
+#'   vector with one entry per text and adds/replaces a `text_id` column. Names
+#'   on `text` are not inspected.
+#' @return A data frame with CLI-style columns: `guide`, `cost`, `strand`,
+#'   `start`, `end`, `match_region`, and `cigar`. If `pattern_id` or `text_id`
+#'   are supplied, mapped identifier columns are included.
 #' @examples
-#' sassy_crispr("ACGTNGG", c(chr1 = "TTTACGTAGGTTT"), k = 0, rc = FALSE)
+#' sassy_crispr(list("ACGTNGG"), list("TTTACGTAGGTTT"), k = 0, rc = FALSE, text_id = "chr1")
 #' @export
 sassy_crispr <- function(guide,
                          text,
@@ -280,61 +300,21 @@ sassy_crispr <- function(guide,
                          max_n_frac = 0.2,
                          rc = TRUE,
                          threads = 1L,
+                         pattern_id = NULL,
                          text_id = NULL) {
-  guide <- sassy_character_vector(guide, "guide")
-  pam_length <- sassy_whole_number(pam_length, "pam_length", min = 1L)
-  allow_pam_edits <- sassy_logical_scalar(allow_pam_edits, "allow_pam_edits")
-  rc <- sassy_logical_scalar(rc, "rc")
-  max_n_frac <- sassy_fraction_scalar(max_n_frac, "max_n_frac")
-  text_ids <- sassy_text_ids(text, text_id)
-
-  guide_len <- nchar(guide, type = "bytes", allowNA = FALSE, keepNA = FALSE)
-  if (any(guide_len < pam_length)) {
-    stop("all guide sequences must be at least pam_length bytes long", call. = FALSE)
-  }
-  pam <- substring(guide, guide_len - pam_length + 1L, guide_len)
-  if (length(unique(pam)) != 1L) {
-    stop("all guide sequences must have the same PAM suffix", call. = FALSE)
-  }
-
-  matches <- sassy_search(
-    pattern = guide,
-    text = text,
-    k = k,
-    alphabet = "iupac",
-    rc = rc,
-    all = TRUE,
-    threads = threads,
-    strategy = "pairwise",
-    match_region = TRUE,
-    sam = FALSE
-  )
-  if (nrow(matches) == 0L) {
-    return(sassy_empty_crispr_matches())
-  }
-
-  keep <- rep(TRUE, nrow(matches))
-  if (!allow_pam_edits) {
-    region_pam <- sassy_suffix(matches$match_region, pam_length)
-    keep <- keep & sassy_iupac_matches(region_pam, pam[matches$pattern_idx + 1L])
-  }
-  keep <- keep & sassy_n_fraction(matches$match_region) <= max_n_frac
-  matches <- matches[keep, , drop = FALSE]
-  if (nrow(matches) == 0L) {
-    return(sassy_empty_crispr_matches())
-  }
-
-  row.names(matches) <- NULL
-  data.frame(
-    guide = guide[matches$pattern_idx + 1L],
-    text_id = text_ids[matches$text_idx + 1L],
-    cost = matches$cost,
-    strand = matches$strand,
-    start = matches$text_start,
-    end = matches$text_end,
-    match_region = matches$match_region,
-    cigar = matches$cigar,
-    stringsAsFactors = FALSE
+  .Call(
+    "RC_sassy_crispr",
+    guide,
+    text,
+    k,
+    pam_length,
+    allow_pam_edits,
+    max_n_frac,
+    rc,
+    threads,
+    pattern_id,
+    text_id,
+    PACKAGE = "Rsassy"
   )
 }
 
@@ -364,53 +344,6 @@ sassy_reverse_complement <- function(x) {
   vapply(strsplit(comp, "", useBytes = TRUE), function(chars) {
     paste0(rev(chars), collapse = "")
   }, character(1), USE.NAMES = FALSE)
-}
-
-sassy_iupac_matches <- function(query, target) {
-  vapply(seq_along(query), function(i) {
-    query_mask <- sassy_iupac_mask(query[[i]])
-    target_mask <- sassy_iupac_mask(target[[i]])
-    !is.null(query_mask) &&
-      !is.null(target_mask) &&
-      length(query_mask) == length(target_mask) &&
-      all(bitwAnd(query_mask, target_mask) > 0L)
-  }, logical(1), USE.NAMES = FALSE)
-}
-
-sassy_iupac_mask <- function(x) {
-  map <- c(
-    A = 1L, C = 2L, T = 4L, U = 4L, G = 8L,
-    N = 15L, R = 9L, Y = 6L, S = 10L, W = 5L,
-    K = 12L, M = 3L, B = 14L, D = 13L, H = 7L,
-    V = 11L, X = 0L
-  )
-  chars <- toupper(strsplit(x, "", useBytes = TRUE)[[1]])
-  mask <- unname(map[chars])
-  if (anyNA(mask)) {
-    return(NULL)
-  }
-  mask
-}
-
-sassy_suffix <- function(x, n) {
-  len <- nchar(x, type = "bytes", allowNA = FALSE, keepNA = FALSE)
-  substring(x, pmax(1L, len - n + 1L), len)
-}
-
-sassy_n_fraction <- function(x) {
-  len <- nchar(x, type = "bytes", allowNA = FALSE, keepNA = FALSE)
-  n_count <- lengths(regmatches(x, gregexpr("[Nn]", x, perl = TRUE)))
-  ifelse(len == 0L, 0, n_count / len)
-}
-
-sassy_character_vector <- function(x, arg) {
-  if (!is.character(x) || anyNA(x)) {
-    stop(sprintf("%s must be a character vector without NA values", arg), call. = FALSE)
-  }
-  if (length(x) == 0L) {
-    stop(sprintf("%s must not be empty", arg), call. = FALSE)
-  }
-  x
 }
 
 sassy_logical_scalar <- function(x, arg) {
@@ -449,61 +382,6 @@ sassy_check_all_strategy <- function(all, strategy) {
     )
   }
   invisible(NULL)
-}
-
-sassy_whole_number <- function(x, arg, min = 0L) {
-  if (!is.numeric(x) || length(x) != 1L || !is.finite(x) || x != floor(x) || x < min) {
-    stop(sprintf("%s must be a whole number >= %d", arg, min), call. = FALSE)
-  }
-  as.integer(x)
-}
-
-sassy_fraction_scalar <- function(x, arg) {
-  if (!is.numeric(x) || length(x) != 1L || !is.finite(x) || x < 0 || x > 1) {
-    stop(sprintf("%s must be a number in [0, 1]", arg), call. = FALSE)
-  }
-  as.numeric(x)
-}
-
-sassy_sequence_count <- function(x, arg) {
-  if (is.raw(x)) {
-    return(1L)
-  }
-  if (is.character(x) || is.list(x)) {
-    return(length(x))
-  }
-  stop(sprintf("%s must be a raw vector, character vector, or list", arg), call. = FALSE)
-}
-
-sassy_text_ids <- function(text, text_id = NULL) {
-  n <- sassy_sequence_count(text, "text")
-  if (!is.null(text_id)) {
-    if (!is.character(text_id) || length(text_id) != n || anyNA(text_id)) {
-      stop("text_id must be NULL or a character vector with one entry per text", call. = FALSE)
-    }
-    return(text_id)
-  }
-  if (!is.raw(text)) {
-    text_names <- names(text)
-    if (!is.null(text_names) && length(text_names) == n && all(nzchar(text_names))) {
-      return(text_names)
-    }
-  }
-  paste0("text_", seq_len(n))
-}
-
-sassy_empty_crispr_matches <- function() {
-  data.frame(
-    guide = character(),
-    text_id = character(),
-    cost = integer(),
-    strand = character(),
-    start = numeric(),
-    end = numeric(),
-    match_region = character(),
-    cigar = character(),
-    stringsAsFactors = FALSE
-  )
 }
 
 #' Print sassy match data frames

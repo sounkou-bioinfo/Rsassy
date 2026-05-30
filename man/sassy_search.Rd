@@ -14,14 +14,16 @@ sassy_search(
   all = FALSE,
   threads = 1L,
   strategy = "pairwise",
+  pattern_id = NULL,
+  text_id = NULL,
   match_region = FALSE,
   sam = FALSE
 )
 }
 \arguments{
-\item{pattern}{Raw vector, character vector, or list of raw vectors / character scalars.}
+\item{pattern}{List of raw vectors or non-missing character scalars.}
 
-\item{text}{Raw vector, character vector, or list of raw vectors / character scalars.}
+\item{text}{List of raw vectors or non-missing character scalars.}
 
 \item{k}{Maximum edit distance.}
 
@@ -43,6 +45,14 @@ SIMD lane. \code{"batch_patterns"} and \code{"encoded_patterns"} (alias \code{"v
 Sassy's multi-pattern encoding, which in \code{sassy} 0.2.1 is implemented for
 \code{alphabet = "iupac"} and equal byte-length patterns.}
 
+\item{pattern_id}{Optional pattern identifiers. If supplied, must be a
+non-missing character vector with one entry per pattern and adds/replaces a
+\code{pattern_id} column. Names on \code{pattern} are not inspected.}
+
+\item{text_id}{Optional text identifiers. If supplied, must be a non-missing
+character vector with one entry per text and adds/replaces a \code{text_id}
+column. Names on \code{text} are not inspected.}
+
 \item{match_region}{If \code{TRUE}, include a \code{match_region} column. Reverse-strand
 regions are reverse-complemented so the region and CIGAR are in the input
 pattern direction.}
@@ -51,12 +61,12 @@ pattern direction.}
 text direction used by SAM and by the upstream \code{sassy --sam} output.}
 }
 \value{
-A data frame with 0-based indices and coordinates: \code{pattern_idx}, \code{text_idx}, \code{text_start}, \code{text_end}, \code{pattern_start}, \code{pattern_end}, \code{cost}, \code{strand}, and \code{cigar}. If requested, also includes \code{match_region}. Rows are ordered by input text, then text start/end coordinate, then pattern index.
+A data frame with 0-based indices and coordinates: \code{pattern_idx}, \code{text_idx}, \code{text_start}, \code{text_end}, \code{pattern_start}, \code{pattern_end}, \code{cost}, \code{strand}, and \code{cigar}. If \code{pattern_id} or \code{text_id} are supplied, mapped identifier columns are included. If requested, also includes \code{match_region}. Rows are ordered by input text, then text start/end coordinate, then pattern index.
 }
 \description{
 Convenience wrapper that creates a searcher, searches, and returns a
 \code{sassy_matches} data frame. Coordinates are 0-based and half-open.
 }
 \examples{
-sassy_search("ACGT", "TTACGTAA", 0, alphabet = "dna", rc = FALSE)
+sassy_search(list("ACGT"), list("TTACGTAA"), 0, alphabet = "dna", rc = FALSE)
 }

@@ -34,7 +34,7 @@ backend is first loaded.
 ``` r
 library(Rsassy)
 
-sassy_search("ATCGATCG", "GGGGATCGATCGTTTT", k = 1, alphabet = "dna")
+sassy_search(list("ATCGATCG"), list("GGGGATCGATCGTTTT"), k = 1, alphabet = "dna")
 #> <sassy_matches> 3 matches
 #> pattern_idx text_idx text_start text_end pattern_start pattern_end cost strand  cigar
 #>           0        0          2       10             0           8    1      -   7=1X
@@ -52,8 +52,8 @@ same direction as the input pattern and CIGAR.
 
 ``` r
 region_matches <- sassy_search(
-  "ATCGATCG",
-  "GGGGATCGATCGTTTT",
+  list("ATCGATCG"),
+  list("GGGGATCGATCGTTTT"),
   k = 1,
   alphabet = "dna",
   match_region = TRUE
@@ -78,7 +78,7 @@ Reuse a searcher when making repeated calls:
 
 ``` r
 searcher <- sassy_searcher("dna")
-sassy_searcher_search(searcher, "ATCGATCG", "GGGGATCGATCGTTTT", k = 1)
+sassy_searcher_search(searcher, list("ATCGATCG"), list("GGGGATCGATCGTTTT"), k = 1)
 #> <sassy_matches> 3 matches
 #> pattern_idx text_idx text_start text_end pattern_start pattern_end cost strand  cigar
 #>           0        0          2       10             0           8    1      -   7=1X
@@ -86,13 +86,15 @@ sassy_searcher_search(searcher, "ATCGATCG", "GGGGATCGATCGTTTT", k = 1)
 #>           0        0          6       14             0           8    1      - 1=1X6=
 ```
 
-Vector inputs search every pattern against every text. For larger
+List inputs search every pattern against every text. Each element can be
+a raw vector or a character scalar, which also leaves room for
+ALTREP-backed string vectors to hand over batches as lists. For larger
 batches, use `threads > 1`.
 
 ``` r
 sassy_search(
-  c("ATG", "TTT"),
-  "CCCCATGCCCCTTT",
+  list("ATG", "TTT"),
+  list("CCCCATGCCCCTTT"),
   k = 1,
   alphabet = "iupac",
   rc = FALSE,
@@ -119,8 +121,8 @@ upstream [Sassy](https://github.com/RagnarGrootKoerkamp/sassy)
 
 ``` r
 sassy_search(
-  "ACGA",
-  "TTTCGTTT",
+  list("ACGA"),
+  list("TTTCGTTT"),
   k = 0,
   alphabet = "dna",
   match_region = TRUE,
@@ -136,9 +138,9 @@ CRISPR guide search is available for in-memory sequences with
 match exactly under IUPAC matching.
 
 ``` r
-sassy_crispr("ACGTNGG", c(chr1 = "TTTACGTAGGTTT"), k = 0, rc = FALSE)
-#>     guide text_id cost strand start end match_region cigar
-#> 1 ACGTNGG    chr1    0      +     3  10      ACGTAGG    7=
+sassy_crispr(list("ACGTNGG"), list("TTTACGTAGGTTT"), k = 0, rc = FALSE)
+#>     guide cost strand start end match_region cigar
+#> 1 ACGTNGG    0      +     3  10      ACGTAGG    7=
 ```
 
 For file-oriented colored `grep`, FASTA/FASTQ filtering, and large

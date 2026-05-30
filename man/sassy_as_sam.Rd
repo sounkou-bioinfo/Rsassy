@@ -25,7 +25,7 @@ to the text direction used by SAM and by upstream \code{sassy --sam} output.
 }
 \examples{
 sassy_as_sam(
-  sassy_search("ACGA", "TTTCGTTT", 0, alphabet = "dna", match_region = TRUE),
+  sassy_search(list("ACGA"), list("TTTCGTTT"), 0, alphabet = "dna", match_region = TRUE),
   alphabet = "dna"
 )
 }

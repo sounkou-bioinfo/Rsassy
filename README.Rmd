@@ -40,7 +40,7 @@ when the backend is first loaded.
 ```{r}
 library(Rsassy)
 
-sassy_search("ATCGATCG", "GGGGATCGATCGTTTT", k = 1, alphabet = "dna")
+sassy_search(list("ATCGATCG"), list("GGGGATCGATCGTTTT"), k = 1, alphabet = "dna")
 ```
 
 The result is a `sassy_matches` data frame with `pattern_idx`, `text_idx`,
@@ -53,8 +53,8 @@ direction as the input pattern and CIGAR.
 
 ```{r}
 region_matches <- sassy_search(
-  "ATCGATCG",
-  "GGGGATCGATCGTTTT",
+  list("ATCGATCG"),
+  list("GGGGATCGATCGTTTT"),
   k = 1,
   alphabet = "dna",
   match_region = TRUE
@@ -74,16 +74,17 @@ Reuse a searcher when making repeated calls:
 
 ```{r}
 searcher <- sassy_searcher("dna")
-sassy_searcher_search(searcher, "ATCGATCG", "GGGGATCGATCGTTTT", k = 1)
+sassy_searcher_search(searcher, list("ATCGATCG"), list("GGGGATCGATCGTTTT"), k = 1)
 ```
 
-Vector inputs search every pattern against every text. For larger batches, use
-`threads > 1`.
+List inputs search every pattern against every text. Each element can be a raw
+vector or a character scalar, which also leaves room for ALTREP-backed string
+vectors to hand over batches as lists. For larger batches, use `threads > 1`.
 
 ```{r}
 sassy_search(
-  c("ATG", "TTT"),
-  "CCCCATGCCCCTTT",
+  list("ATG", "TTT"),
+  list("CCCCATGCCCCTTT"),
   k = 1,
   alphabet = "iupac",
   rc = FALSE,
@@ -104,8 +105,8 @@ reverse-strand `match_region` and `cigar` in text direction, matching upstream
 
 ```{r}
 sassy_search(
-  "ACGA",
-  "TTTCGTTT",
+  list("ACGA"),
+  list("TTTCGTTT"),
   k = 0,
   alphabet = "dna",
   match_region = TRUE,
@@ -118,7 +119,7 @@ Guides include the PAM suffix; by default the PAM must match exactly under IUPAC
 matching.
 
 ```{r}
-sassy_crispr("ACGTNGG", c(chr1 = "TTTACGTAGGTTT"), k = 0, rc = FALSE)
+sassy_crispr(list("ACGTNGG"), list("TTTACGTAGGTTT"), k = 0, rc = FALSE)
 ```
 
 For file-oriented colored `grep`, FASTA/FASTQ filtering, and large command-line

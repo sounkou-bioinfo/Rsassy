@@ -13,14 +13,16 @@ sassy_crispr(
   max_n_frac = 0.2,
   rc = TRUE,
   threads = 1L,
+  pattern_id = NULL,
   text_id = NULL
 )
 }
 \arguments{
-\item{guide}{Character vector of guide sequences including the PAM suffix.}
+\item{guide}{List of guide sequences including the PAM suffix. Each element
+must be a raw vector or non-missing character scalar.}
 
-\item{text}{Text sequences to search; a character vector, raw vector, or list
-of raw/character scalars accepted by \code{\link[=sassy_search]{sassy_search()}}.}
+\item{text}{List of text sequences to search. Each element must be a raw
+vector or non-missing character scalar.}
 
 \item{k}{Maximum edit distance for the searched guide sequence. With
 \code{allow_pam_edits = FALSE}, the exact-PAM filter means this is effectively
@@ -36,12 +38,18 @@ the edit threshold outside the PAM.}
 
 \item{threads}{Number of worker threads to request.}
 
-\item{text_id}{Optional text identifiers. Defaults to names on \code{text} when
-all names are non-empty, otherwise \code{text_1}, \code{text_2}, ...}
+\item{pattern_id}{Optional guide/pattern identifiers. If supplied, must be a
+character vector with one entry per guide and adds/replaces a \code{pattern_id}
+column. Names on \code{guide} are not inspected.}
+
+\item{text_id}{Optional text identifiers. If supplied, must be a character
+vector with one entry per text and adds/replaces a \code{text_id} column. Names
+on \code{text} are not inspected.}
 }
 \value{
-A data frame with CLI-style columns: \code{guide}, \code{text_id}, \code{cost},
-\code{strand}, \code{start}, \code{end}, \code{match_region}, and \code{cigar}.
+A data frame with CLI-style columns: \code{guide}, \code{cost}, \code{strand},
+\code{start}, \code{end}, \code{match_region}, and \code{cigar}. If \code{pattern_id} or \code{text_id}
+are supplied, mapped identifier columns are included.
 }
 \description{
 \code{sassy_crispr()} is an R-level equivalent of the upstream \verb{sassy crispr}
@@ -50,5 +58,5 @@ default, the PAM must match exactly under IUPAC matching, while the rest of
 the guide may have up to \code{k} edits.
 }
 \examples{
-sassy_crispr("ACGTNGG", c(chr1 = "TTTACGTAGGTTT"), k = 0, rc = FALSE)
+sassy_crispr(list("ACGTNGG"), list("TTTACGTAGGTTT"), k = 0, rc = FALSE, text_id = "chr1")
 }

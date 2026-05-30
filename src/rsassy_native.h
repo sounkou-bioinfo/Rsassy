@@ -52,6 +52,20 @@ typedef int (*Rsassy_searcher_search_many_fn)(RsassySearcher *searcher,
                                               bool include_match_region,
                                               RsassyMatch **out_matches,
                                               uintptr_t *out_len);
+typedef int (*Rsassy_crispr_search_many_fn)(const uint8_t **guides,
+                                            const uintptr_t *guide_lens,
+                                            uintptr_t n_guides,
+                                            const uint8_t **texts,
+                                            const uintptr_t *text_lens,
+                                            uintptr_t n_texts,
+                                            uintptr_t k,
+                                            uintptr_t pam_length,
+                                            bool allow_pam_edits,
+                                            float max_n_frac,
+                                            bool rc,
+                                            uintptr_t threads,
+                                            RsassyMatch **out_matches,
+                                            uintptr_t *out_len);
 typedef void (*Rsassy_matches_free_fn)(RsassyMatch *matches, uintptr_t len);
 typedef const char *(*Rsassy_last_error_message_fn)(void);
 typedef const char *(*Rsassy_features_string_fn)(void);
@@ -83,6 +97,20 @@ extern int rsassy_searcher_search_many(RsassySearcher *searcher,
                                        bool include_match_region,
                                        RsassyMatch **out_matches,
                                        uintptr_t *out_len);
+extern int rsassy_crispr_search_many(const uint8_t **guides,
+                                     const uintptr_t *guide_lens,
+                                     uintptr_t n_guides,
+                                     const uint8_t **texts,
+                                     const uintptr_t *text_lens,
+                                     uintptr_t n_texts,
+                                     uintptr_t k,
+                                     uintptr_t pam_length,
+                                     bool allow_pam_edits,
+                                     float max_n_frac,
+                                     bool rc,
+                                     uintptr_t threads,
+                                     RsassyMatch **out_matches,
+                                     uintptr_t *out_len);
 extern void rsassy_matches_free(RsassyMatch *matches, uintptr_t len);
 extern const char *rsassy_last_error_message(void);
 extern const char *rsassy_features_string(void);
@@ -91,6 +119,7 @@ extern Rsassy_searcher_new_fn Rsassy_rsassy_searcher_new;
 extern Rsassy_searcher_free_fn Rsassy_rsassy_searcher_free;
 extern Rsassy_searcher_search_fn Rsassy_rsassy_searcher_search;
 extern Rsassy_searcher_search_many_fn Rsassy_rsassy_searcher_search_many;
+extern Rsassy_crispr_search_many_fn Rsassy_rsassy_crispr_search_many;
 extern Rsassy_matches_free_fn Rsassy_rsassy_matches_free;
 extern Rsassy_last_error_message_fn Rsassy_rsassy_last_error_message;
 extern Rsassy_features_string_fn Rsassy_rsassy_features_string;
@@ -99,6 +128,7 @@ extern Rsassy_features_string_fn Rsassy_rsassy_features_string;
 #define rsassy_searcher_free Rsassy_rsassy_searcher_free
 #define rsassy_searcher_search Rsassy_rsassy_searcher_search
 #define rsassy_searcher_search_many Rsassy_rsassy_searcher_search_many
+#define rsassy_crispr_search_many Rsassy_rsassy_crispr_search_many
 #define rsassy_matches_free Rsassy_rsassy_matches_free
 #define rsassy_last_error_message Rsassy_rsassy_last_error_message
 #define rsassy_features_string Rsassy_rsassy_features_string
