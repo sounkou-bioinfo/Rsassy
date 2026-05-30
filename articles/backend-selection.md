@@ -1,0 +1,56 @@
+# Backend Selection
+
+Native `Rsassy` installs a small R/C shim plus Rust backend libraries.
+The C shim selects one backend per R process.
+
+## Default selection
+
+With the default `"auto"` setting, Rsassy chooses the best installed
+backend supported by the current runtime:
+
+1.  WebAssembly SIMD128 on wasm builds
+2.  AVX-512 on supported x86_64 machines
+3.  AVX2 on supported x86_64 machines
+4.  NEON on supported arm64 machines
+5.  scalar fallback
+
+Inspect the installed package with:
+
+``` r
+
+features <- sassy_features()
+features[c(
+  "rsassy_dispatch",
+  "rsassy_selected_backend",
+  "rsassy_installed_backends",
+  "rsassy_supported_backends"
+)]
+```
+
+## Explicit backend requests
+
+Use
+[`sassy_set_backend()`](https://sounkou-bioinfo.github.io/Rsassy/reference/sassy_set_backend.md)
+before the first native Rsassy call when benchmarking or debugging a
+specific backend.
+
+``` r
+
+library(Rsassy)
+sassy_set_backend("scalar")
+sassy_features()$rsassy_selected_backend
+```
+
+Backend loading is intentionally one-shot. `Rsassy` does not unload and
+reload native backend DLLs in-process because doing so is not portable
+across R platforms. Benchmark different backends in separate fresh
+`Rscript` processes.
+
+## Why not one static library?
+
+The upstream `sassy` crate selects SIMD behavior through
+crate/build-level configuration and SIMD-dependent types. That makes a
+single function-pointer multiversioning layer harder than in small demos
+where every backend is an explicit leaf function. The current package
+therefore uses separate backend libraries for native platforms and a
+static Rust path for webR/wasm.

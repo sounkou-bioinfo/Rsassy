@@ -1,0 +1,56 @@
+# Source Installation and Vendoring
+
+`Rsassy` is a standalone R package. Its Rust crate depends on `sassy`
+from crates.io:
+
+``` toml
+sassy = { version = "0.2.1", default-features = false }
+```
+
+## Checkout installs
+
+A normal checkout install may resolve Rust crates from crates.io:
+
+``` sh
+R CMD INSTALL .
+```
+
+The package build uses R’s standard native build hooks:
+
+- `configure` / `configure.win` generate `src/Makevars` files.
+- `src/Makevars.in` / `src/Makevars.win.in` build the Rust backend
+  libraries.
+- `src/install.libs.R` installs backend libraries under `backends/`
+  rather than under R’s main `libs/` directory.
+- `cleanup` removes generated build artifacts.
+
+## CRAN/offline source packages
+
+CRAN-style source package builds should not depend on network access
+during installation. Before building a release tarball for such a
+target, vendor Rust crates explicitly:
+
+``` sh
+make vendor-rust
+R CMD build .
+```
+
+`make vendor-rust` writes:
+
+``` text
+src/rust/vendor.tar.xz
+inst/AUTHORS
+inst/LICENCE.note
+```
+
+These files are generated release artifacts. They are intentionally not
+tracked in the development repository by default.
+
+## Build parallelism
+
+`make check` uses a conservative Cargo job count suitable for shared
+check machines. For local development, increase it explicitly:
+
+``` sh
+make CARGO_JOBS=10 check
+```
