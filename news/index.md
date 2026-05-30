@@ -33,6 +33,11 @@
 - Added class `sassy_matches` and
   [`print.sassy_matches()`](https://sounkou-bioinfo.github.io/Rsassy/reference/print.sassy_matches.md).
 - Added optional ANSI coloring for printed match regions.
+- Added SAM-compatible reverse-strand formatting with `sam = TRUE` and
+  [`sassy_as_sam()`](https://sounkou-bioinfo.github.io/Rsassy/reference/sassy_as_sam.md).
+- Added
+  [`sassy_crispr()`](https://sounkou-bioinfo.github.io/Rsassy/reference/sassy_crispr.md)
+  for in-memory CRISPR guide target searches.
 - Added R connection input through
   [`sassy_search_connection()`](https://sounkou-bioinfo.github.io/Rsassy/reference/sassy_search_connection.md).
 - Added result columns `pattern_idx`, `text_idx`, `text_start`,

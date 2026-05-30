@@ -23,7 +23,8 @@ sassy_search_connection(
   mode = "single",
   chunk_size = 1024 * 1024,
   overlap = NULL,
-  match_region = FALSE
+  match_region = FALSE,
+  sam = FALSE
 )
 ```
 
@@ -85,6 +86,11 @@ sassy_search_connection(
   If `TRUE`, include a `match_region` column. Reverse-strand regions are
   reverse-complemented so the region and CIGAR are in the input pattern
   direction.
+
+- sam:
+
+  If `TRUE`, format reverse-strand `match_region` and `cigar` in the
+  text direction used by SAM and by the upstream `sassy --sam` output.
 
 ## Value
 

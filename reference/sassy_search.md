@@ -16,7 +16,8 @@ sassy_search(
   all = FALSE,
   threads = 1L,
   mode = "single",
-  match_region = FALSE
+  match_region = FALSE,
+  sam = FALSE
 )
 ```
 
@@ -65,6 +66,11 @@ sassy_search(
   If `TRUE`, include a `match_region` column. Reverse-strand regions are
   reverse-complemented so the region and CIGAR are in the input pattern
   direction.
+
+- sam:
+
+  If `TRUE`, format reverse-strand `match_region` and `cigar` in the
+  text direction used by SAM and by the upstream `sassy --sam` output.
 
 ## Value
 

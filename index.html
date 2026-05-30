@@ -100,7 +100,7 @@
 <span><span class="co">#&gt;           0        0          4       12             0           8    0      +     8=     ATCGATCG</span></span>
 <span><span class="co">#&gt;           0        0          6       14             0           8    1      - 1=1X6=     AACGATCG</span></span>
 <span><span class="co">#&gt;           0        0          2       10             0           8    1      -   7=1X     ATCGATCC</span></span></code></pre></div>
-<p>The print method can color <code>match_region</code> with simple ANSI escape sequences, following the CLI <code>sassy grep</code> alignment legend: green for matching characters, orange for mismatches, blue for inserted text characters, and red gaps for pattern characters absent from the text. Coloring is off by default and is meant for ANSI-capable interactive terminals.</p>
+<p>The print method can color <code>match_region</code> with simple ANSI escape sequences, following the upstream <a href="https://github.com/RagnarGrootKoerkamp/sassy" class="external-link">Sassy</a> CLI <code>sassy grep</code> alignment legend: green for matching characters, orange for mismatches, blue for inserted text characters, and red gaps for pattern characters absent from the text. Coloring is off by default and is meant for ANSI-capable interactive terminals.</p>
 <p>Reuse a searcher when making repeated calls:</p>
 <div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">searcher</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/sassy_searcher.html">sassy_searcher</a></span><span class="op">(</span><span class="st">"dna"</span><span class="op">)</span></span>
@@ -124,9 +124,28 @@
 <span><span class="co">#&gt; pattern_idx text_idx text_start text_end pattern_start pattern_end cost strand cigar</span></span>
 <span><span class="co">#&gt;           0        0          4        7             0           3    0      +    3=</span></span>
 <span><span class="co">#&gt;           1        0         11       14             0           3    0      +    3=</span></span></code></pre></div>
-<p><code>mode = "encoded_patterns"</code> (alias <code>"v2"</code>) is the R equivalent of CLI <code>--v2</code> for many equal-length short patterns. <code>batch_patterns</code> and <code>encoded_patterns</code> use Sassy’s multi-pattern encoding, which in <code>sassy</code> 0.2.1 is implemented for IUPAC and equal byte-length patterns. Use <code>single</code> for other alphabets or mixed pattern lengths.</p>
-<p>Connections can be searched without an R-level read loop and return the same match columns with stream-relative coordinates:</p>
+<p><code>mode = "encoded_patterns"</code> (alias <code>"v2"</code>) is the R equivalent of CLI <code>--v2</code> for many equal-length short patterns. <code>batch_patterns</code> and <code>encoded_patterns</code> use <a href="https://github.com/RagnarGrootKoerkamp/sassy" class="external-link">Sassy</a>’s multi-pattern encoding, which in <code>sassy</code> 0.2.1 is implemented for IUPAC and equal byte-length patterns. Use <code>single</code> for other alphabets or mixed pattern lengths.</p>
+<p>CLI-compatible orientation is available with <code>sam = TRUE</code>. This formats reverse-strand <code>match_region</code> and <code>cigar</code> in text direction, matching upstream <a href="https://github.com/RagnarGrootKoerkamp/sassy" class="external-link">Sassy</a> <code>sassy --sam</code> output.</p>
 <div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="reference/sassy_search.html">sassy_search</a></span><span class="op">(</span></span>
+<span>  <span class="st">"ACGA"</span>,</span>
+<span>  <span class="st">"TTTCGTTT"</span>,</span>
+<span>  k <span class="op">=</span> <span class="fl">0</span>,</span>
+<span>  alphabet <span class="op">=</span> <span class="st">"dna"</span>,</span>
+<span>  match_region <span class="op">=</span> <span class="cn">TRUE</span>,</span>
+<span>  sam <span class="op">=</span> <span class="cn">TRUE</span></span>
+<span><span class="op">)</span></span>
+<span><span class="co">#&gt; &lt;sassy_matches&gt; 1 match</span></span>
+<span><span class="co">#&gt; pattern_idx text_idx text_start text_end pattern_start pattern_end cost strand cigar match_region</span></span>
+<span><span class="co">#&gt;           0        0          2        6             0           4    0      -    4=         TCGT</span></span></code></pre></div>
+<p>CRISPR guide search is available for in-memory sequences with <code><a href="reference/sassy_crispr.html">sassy_crispr()</a></code>. Guides include the PAM suffix; by default the PAM must match exactly under IUPAC matching.</p>
+<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="reference/sassy_crispr.html">sassy_crispr</a></span><span class="op">(</span><span class="st">"ACGTNGG"</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>chr1 <span class="op">=</span> <span class="st">"TTTACGTAGGTTT"</span><span class="op">)</span>, k <span class="op">=</span> <span class="fl">0</span>, rc <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
+<span><span class="co">#&gt;     guide text_id cost strand start end match_region cigar</span></span>
+<span><span class="co">#&gt; 1 ACGTNGG    chr1    0      +     3  10      ACGTAGG    7=</span></span></code></pre></div>
+<p>For file-oriented colored <code>grep</code>, FASTA/FASTQ filtering, and large command-line pipelines, use the upstream <a href="https://github.com/RagnarGrootKoerkamp/sassy" class="external-link">Sassy</a> CLI directly.</p>
+<p>Connections can be searched without an R-level read loop and return the same match columns with stream-relative coordinates:</p>
+<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">tmp</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempfile</a></span><span class="op">(</span>fileext <span class="op">=</span> <span class="st">".gz"</span><span class="op">)</span></span>
 <span><span class="va">con</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/connections.html" class="external-link">gzfile</a></span><span class="op">(</span><span class="va">tmp</span>, <span class="st">"wb"</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/readBin.html" class="external-link">writeBin</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/rawConversion.html" class="external-link">charToRaw</a></span><span class="op">(</span><span class="st">"CCCCATGCCCCTTT"</span><span class="op">)</span>, <span class="va">con</span><span class="op">)</span></span>
@@ -141,7 +160,7 @@
 <span><span class="fu"><a href="https://rdrr.io/r/base/connections.html" class="external-link">close</a></span><span class="op">(</span><span class="va">con</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/unlink.html" class="external-link">unlink</a></span><span class="op">(</span><span class="va">tmp</span><span class="op">)</span></span></code></pre></div>
 <p>Inspect the installed build:</p>
-<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="reference/sassy_features.html">sassy_features</a></span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="co">#&gt; &lt;sassy_features&gt;</span></span>
 <span><span class="co">#&gt; dispatch: dynamic</span></span>
@@ -156,13 +175,13 @@
 <h2 id="development">Development<a class="anchor" aria-label="anchor" href="#development"></a>
 </h2>
 <p>Common development commands from the repository root:</p>
-<div class="sourceCode" id="cb8"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a><span class="fu">make</span> vendor-rust  <span class="co"># refresh src/rust/vendor.tar.xz after Rust dependency changes</span></span>
-<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a><span class="fu">make</span> rd           <span class="co"># regenerate NAMESPACE and man/*.Rd from R/search.R</span></span>
-<span id="cb8-3"><a href="#cb8-3" tabindex="-1"></a><span class="fu">make</span> readme       <span class="co"># regenerate README.md from README.Rmd</span></span>
-<span id="cb8-4"><a href="#cb8-4" tabindex="-1"></a><span class="fu">make</span> install      <span class="co"># install the package locally</span></span>
-<span id="cb8-5"><a href="#cb8-5" tabindex="-1"></a><span class="fu">make</span> test         <span class="co"># run tinytest tests</span></span>
-<span id="cb8-6"><a href="#cb8-6" tabindex="-1"></a><span class="fu">make</span> check        <span class="co"># build and run R CMD check</span></span>
-<span id="cb8-7"><a href="#cb8-7" tabindex="-1"></a><span class="fu">make</span> clean        <span class="co"># remove generated build artifacts</span></span></code></pre></div>
+<div class="sourceCode" id="cb10"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a><span class="fu">make</span> vendor-rust  <span class="co"># refresh src/rust/vendor.tar.xz after Rust dependency changes</span></span>
+<span id="cb10-2"><a href="#cb10-2" tabindex="-1"></a><span class="fu">make</span> rd           <span class="co"># regenerate NAMESPACE and man/*.Rd from R/search.R</span></span>
+<span id="cb10-3"><a href="#cb10-3" tabindex="-1"></a><span class="fu">make</span> readme       <span class="co"># regenerate README.md from README.Rmd</span></span>
+<span id="cb10-4"><a href="#cb10-4" tabindex="-1"></a><span class="fu">make</span> install      <span class="co"># install the package locally</span></span>
+<span id="cb10-5"><a href="#cb10-5" tabindex="-1"></a><span class="fu">make</span> test         <span class="co"># run tinytest tests</span></span>
+<span id="cb10-6"><a href="#cb10-6" tabindex="-1"></a><span class="fu">make</span> check        <span class="co"># build and run R CMD check</span></span>
+<span id="cb10-7"><a href="#cb10-7" tabindex="-1"></a><span class="fu">make</span> clean        <span class="co"># remove generated build artifacts</span></span></code></pre></div>
 <p><code>make check</code> uses a CRAN-safe default of two Cargo build jobs. Use <code>make check-fast</code> or <code>make CARGO_JOBS=10 check</code> for local multithreaded Cargo builds.</p>
 </div>
 </div>
