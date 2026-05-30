@@ -3,8 +3,11 @@
 ^\.RData$
 ^\.Rproj$
 ^\.vscode$
+^\.github$
 ^\.dockerignore$
 ^\.gitignore$
+^_pkgdown\.yml$
+^docs$
 ^Makefile$
 ^Dockerfile.*$
 ^README\.html$

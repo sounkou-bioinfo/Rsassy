@@ -14,13 +14,60 @@ NULL
 #' fields describe the loaded Rust backend. The `cpu_*` fields are detected by
 #' the C shim.
 #'
-#' @return A named list of build, selected-backend, and CPU/runtime feature
-#'   values.
+#' @return A `sassy_features` list of build, selected-backend, and
+#'   CPU/runtime feature values.
 #' @examples
-#' names(sassy_features())
+#' sassy_features()
 #' @export
 sassy_features <- function() {
-  .Call("RC_sassy_features", PACKAGE = "Rsassy")
+  features <- .Call("RC_sassy_features", PACKAGE = "Rsassy")
+  class(features) <- c("sassy_features", class(features))
+  features
+}
+
+#' Print Rsassy feature information
+#'
+#' @param x A `sassy_features` object returned by [sassy_features()].
+#' @param ... Ignored; accepted for compatibility with [print()].
+#' @return `x`, invisibly.
+#' @export
+print.sassy_features <- function(x, ...) {
+  cat("<sassy_features>\n")
+  cat("dispatch: ", sassy_feature_scalar(x$rsassy_dispatch), "\n", sep = "")
+  cat("selected backend: ", sassy_feature_scalar(x$rsassy_selected_backend), "\n", sep = "")
+  cat("installed backends: ", sassy_feature_collapse(x$rsassy_installed_backends), "\n", sep = "")
+  cat("supported backends: ", sassy_feature_collapse(x$rsassy_supported_backends), "\n", sep = "")
+  cat("CPU: avx2=", sassy_feature_bool(x$cpu_avx2),
+    " avx512f=", sassy_feature_bool(x$cpu_avx512f),
+    " neon=", sassy_feature_bool(x$cpu_neon), "\n",
+    sep = ""
+  )
+  cat("Rust backend: ", sassy_feature_scalar(x$selected_simd_backend),
+    " (native_simd=", sassy_feature_bool(x$selected_native_simd), ")\n",
+    sep = ""
+  )
+  invisible(x)
+}
+
+sassy_feature_scalar <- function(x) {
+  if (is.null(x) || length(x) == 0L || is.na(x[[1L]])) {
+    return("<unknown>")
+  }
+  as.character(x[[1L]])
+}
+
+sassy_feature_collapse <- function(x) {
+  if (is.null(x) || length(x) == 0L) {
+    return("<none>")
+  }
+  paste(as.character(x), collapse = ", ")
+}
+
+sassy_feature_bool <- function(x) {
+  if (is.null(x) || length(x) == 0L || is.na(x[[1L]])) {
+    return("?")
+  }
+  if (isTRUE(x[[1L]])) "yes" else "no"
 }
 
 #' Select the Rsassy native backend

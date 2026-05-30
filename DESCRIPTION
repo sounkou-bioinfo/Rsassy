@@ -18,6 +18,12 @@ License: file LICENSE
 Encoding: UTF-8
 SystemRequirements: Cargo (Rust's package manager), rustc >= 1.91.0, xz
 Suggests:
+    knitr,
+    rmarkdown,
     tinytest
+VignetteBuilder: knitr
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.3
+URL: https://github.com/sounkou-bioinfo/Rsassy, https://sounkou-bioinfo.github.io/Rsassy/
+BugReports: https://github.com/sounkou-bioinfo/Rsassy/issues
+Config/Needs/website: pkgdown

@@ -124,73 +124,13 @@ unlink(tmp)
 Inspect the installed build:
 
 ```{r}
-features <- sassy_features()
-data.frame(
-  feature = rep(names(features), lengths(features)),
-  value = unlist(features, use.names = FALSE),
-  row.names = NULL
-)
+sassy_features()
 ```
 
-For backend benchmarks, run each backend in a separate R process because the
-backend is loaded once per process and remains fixed for the lifetime of that
-process. Select a backend explicitly with `sassy_set_backend()` before any other
-native Rsassy call, or use the default auto-selection. Rsassy does not unload
-and replace backend DLLs because that is not reliable across R platforms. This
-chunk launches independent `Rscript` processes and reads one CSV row from each.
-Text construction and warm-up happen outside the timed section, which scans
-about 2.5 GB per backend by default.
-
-```{r}
-bench_backend <- function(backend, reps = 50L, n_bases = 50000000L) {
-  script <- tempfile(fileext = ".R")
-  out <- tempfile(fileext = ".csv")
-  writeLines(c(
-    "args <- commandArgs(trailingOnly = TRUE)",
-    "backend <- args[[1L]]",
-    "reps <- as.integer(args[[2L]])",
-    "n_bases <- as.integer(args[[3L]])",
-    "out <- args[[4L]]",
-    "library(Rsassy)",
-    "sassy_set_backend(backend)",
-    "pattern <- paste(rep('ACGT', 8L), collapse = '')",
-    "chunk <- paste(rep(c('TTTTCCCCAAAAGGGG', 'CCCTTTTGGGGAAAAA', 'GGGGAAAATTTTCCCC', 'AAAAGGGGCCCCTTTT'), 16L), collapse = '')",
-    "filler <- paste(rep(chunk, ceiling(1000000L / nchar(chunk))), collapse = '')",
-    "unit <- paste0(substr(filler, 1L, 1000000L - nchar(pattern)), pattern)",
-    "text <- paste(rep(unit, ceiling(n_bases / nchar(unit))), collapse = '')",
-    "text <- substr(text, 1L, n_bases)",
-    "warmup <- sassy_search(pattern, text, 2, alphabet = 'dna', rc = FALSE)",
-    "invisible(gc())",
-    "hits <- 0L",
-    "elapsed <- system.time(for (i in seq_len(reps)) hits <- hits + nrow(sassy_search(pattern, text, 2, alphabet = 'dna', rc = FALSE)))[['elapsed']]",
-    "scanned_mb <- as.numeric(n_bases) * reps / 1e6",
-    "write.csv(data.frame(requested_backend = backend, selected_backend = sassy_features()$rsassy_selected_backend, text_mb = n_bases / 1e6, searches = reps, scanned_mb = scanned_mb, matches_per_search = nrow(warmup), elapsed_seconds = elapsed, mb_per_second = scanned_mb / elapsed), out, row.names = FALSE)"
-  ), script)
-  on.exit(unlink(c(script, out)), add = TRUE)
-  status <- system2(
-    file.path(R.home("bin"), "Rscript"),
-    c("--vanilla", script, backend, reps, n_bases, out)
-  )
-  if (!identical(status, 0L)) {
-    stop("backend benchmark failed for ", backend, call. = FALSE)
-  }
-  read.csv(out, stringsAsFactors = FALSE)
-}
-
-has_backend <- function(name) {
-  name %in% features$rsassy_supported_backends
-}
-bench_backends <- c(
-  "scalar",
-  if (isTRUE(features$cpu_avx2) && has_backend("avx2")) "avx2",
-  if (isTRUE(features$cpu_avx512f) && has_backend("avx512")) "avx512",
-  if (isTRUE(features$cpu_neon) && has_backend("neon")) "neon"
-)
-bench <- do.call(rbind, lapply(bench_backends, bench_backend))
-bench$speedup_vs_scalar <- bench$elapsed_seconds[match("scalar", bench$selected_backend)] /
-  bench$elapsed_seconds
-bench
-```
+Backend loading is one-shot per R process. If you need to benchmark or debug a
+specific backend, call `sassy_set_backend()` before the first native Rsassy call
+in a fresh `Rscript` process. See `vignette("backend-selection", package =
+"Rsassy")` for the details.
 
 ## Check
 

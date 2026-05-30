@@ -7,8 +7,8 @@
 sassy_features()
 }
 \value{
-A named list of build, selected-backend, and CPU/runtime feature
-values.
+A \code{sassy_features} list of build, selected-backend, and
+CPU/runtime feature values.
 }
 \description{
 Returns diagnostic information about the selected Rsassy backend. Calling
@@ -23,5 +23,5 @@ fields describe the loaded Rust backend. The \verb{cpu_*} fields are detected by
 the C shim.
 }
 \examples{
-names(sassy_features())
+sassy_features()
 }

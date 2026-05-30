@@ -140,101 +140,20 @@ unlink(tmp)
 Inspect the installed build:
 
 ``` r
-features <- sassy_features()
-data.frame(
-  feature = rep(names(features), lengths(features)),
-  value = unlist(features, use.names = FALSE),
-  row.names = NULL
-)
-#>                           feature            value
-#> 1                 rsassy_dispatch          dynamic
-#> 2         rsassy_selected_backend             avx2
-#> 3       rsassy_installed_backends           scalar
-#> 4       rsassy_installed_backends             avx2
-#> 5       rsassy_installed_backends           avx512
-#> 6       rsassy_supported_backends           scalar
-#> 7       rsassy_supported_backends             avx2
-#> 8                        cpu_avx2             TRUE
-#> 9                     cpu_avx512f            FALSE
-#> 10                       cpu_neon            FALSE
-#> 11            rsassy_rust_version 0.2.1-0.1.0.9000
-#> 12                    target_arch           x86_64
-#> 13                      target_os            linux
-#> 14          selected_simd_backend             avx2
-#> 15       selected_portable_scalar            FALSE
-#> 16           selected_native_simd             TRUE
-#> 17         selected_compiled_avx2             TRUE
-#> 18      selected_compiled_avx512f            FALSE
-#> 19         selected_compiled_neon            FALSE
-#> 20 selected_compiled_wasm_simd128            FALSE
+sassy_features()
+#> <sassy_features>
+#> dispatch: dynamic
+#> selected backend: avx2
+#> installed backends: scalar, avx2, avx512
+#> supported backends: scalar, avx2
+#> CPU: avx2=yes avx512f=no neon=no
+#> Rust backend: avx2 (native_simd=yes)
 ```
 
-For backend benchmarks, run each backend in a separate R process because
-the backend is loaded once per process and remains fixed for the
-lifetime of that process. Select a backend explicitly with
-`sassy_set_backend()` before any other native Rsassy call, or use the
-default auto-selection. Rsassy does not unload and replace backend DLLs
-because that is not reliable across R platforms. This chunk launches
-independent `Rscript` processes and reads one CSV row from each. Text
-construction and warm-up happen outside the timed section, which scans
-about 2.5 GB per backend by default.
-
-``` r
-bench_backend <- function(backend, reps = 50L, n_bases = 50000000L) {
-  script <- tempfile(fileext = ".R")
-  out <- tempfile(fileext = ".csv")
-  writeLines(c(
-    "args <- commandArgs(trailingOnly = TRUE)",
-    "backend <- args[[1L]]",
-    "reps <- as.integer(args[[2L]])",
-    "n_bases <- as.integer(args[[3L]])",
-    "out <- args[[4L]]",
-    "library(Rsassy)",
-    "sassy_set_backend(backend)",
-    "pattern <- paste(rep('ACGT', 8L), collapse = '')",
-    "chunk <- paste(rep(c('TTTTCCCCAAAAGGGG', 'CCCTTTTGGGGAAAAA', 'GGGGAAAATTTTCCCC', 'AAAAGGGGCCCCTTTT'), 16L), collapse = '')",
-    "filler <- paste(rep(chunk, ceiling(1000000L / nchar(chunk))), collapse = '')",
-    "unit <- paste0(substr(filler, 1L, 1000000L - nchar(pattern)), pattern)",
-    "text <- paste(rep(unit, ceiling(n_bases / nchar(unit))), collapse = '')",
-    "text <- substr(text, 1L, n_bases)",
-    "warmup <- sassy_search(pattern, text, 2, alphabet = 'dna', rc = FALSE)",
-    "invisible(gc())",
-    "hits <- 0L",
-    "elapsed <- system.time(for (i in seq_len(reps)) hits <- hits + nrow(sassy_search(pattern, text, 2, alphabet = 'dna', rc = FALSE)))[['elapsed']]",
-    "scanned_mb <- as.numeric(n_bases) * reps / 1e6",
-    "write.csv(data.frame(requested_backend = backend, selected_backend = sassy_features()$rsassy_selected_backend, text_mb = n_bases / 1e6, searches = reps, scanned_mb = scanned_mb, matches_per_search = nrow(warmup), elapsed_seconds = elapsed, mb_per_second = scanned_mb / elapsed), out, row.names = FALSE)"
-  ), script)
-  on.exit(unlink(c(script, out)), add = TRUE)
-  status <- system2(
-    file.path(R.home("bin"), "Rscript"),
-    c("--vanilla", script, backend, reps, n_bases, out)
-  )
-  if (!identical(status, 0L)) {
-    stop("backend benchmark failed for ", backend, call. = FALSE)
-  }
-  read.csv(out, stringsAsFactors = FALSE)
-}
-
-has_backend <- function(name) {
-  name %in% features$rsassy_supported_backends
-}
-bench_backends <- c(
-  "scalar",
-  if (isTRUE(features$cpu_avx2) && has_backend("avx2")) "avx2",
-  if (isTRUE(features$cpu_avx512f) && has_backend("avx512")) "avx512",
-  if (isTRUE(features$cpu_neon) && has_backend("neon")) "neon"
-)
-bench <- do.call(rbind, lapply(bench_backends, bench_backend))
-bench$speedup_vs_scalar <- bench$elapsed_seconds[match("scalar", bench$selected_backend)] /
-  bench$elapsed_seconds
-bench
-#>   requested_backend selected_backend text_mb searches scanned_mb
-#> 1            scalar           scalar      50       50       2500
-#> 2              avx2             avx2      50       50       2500
-#>   matches_per_search elapsed_seconds mb_per_second speedup_vs_scalar
-#> 1                 50           1.281      1951.600              1.00
-#> 2                 50           0.700      3571.429              1.83
-```
+Backend loading is one-shot per R process. If you need to benchmark or
+debug a specific backend, call `sassy_set_backend()` before the first
+native Rsassy call in a fresh `Rscript` process. See
+`vignette("backend-selection", package = "Rsassy")` for the details.
 
 ## Check
 
