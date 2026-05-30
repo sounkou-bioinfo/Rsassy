@@ -38,7 +38,6 @@ the C shim.'></head><body>
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles"><li><a class="dropdown-item" href="../articles/getting-started.html">Getting Started with Rsassy</a></li>
     <li><a class="dropdown-item" href="../articles/api-and-coordinates.html">API and Coordinates</a></li>
-    <li><a class="dropdown-item" href="../articles/connection-search.html">Searching R Connections</a></li>
     <li><a class="dropdown-item" href="../articles/backend-selection.html">Backend Selection</a></li>
     <li><a class="dropdown-item" href="../articles/source-installation-and-vendoring.html">Development and Vendoring</a></li>
   </ul></li>
@@ -88,11 +87,11 @@ CPU/runtime feature values.</p>
     <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="fu">sassy_features</span><span class="op">(</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> &lt;sassy_features&gt;</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> dispatch: dynamic</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> selected backend: avx2</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> selected backend: avx512</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> installed backends: scalar, avx2, avx512</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> supported backends: scalar, avx2</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> CPU: avx2=yes avx512f=no neon=no</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Rust backend: avx2 (native_simd=yes)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> supported backends: scalar, avx2, avx512</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> CPU: avx2=yes avx512f=yes neon=no</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Rust backend: avx512f (native_simd=yes)</span>
 </code></pre></div>
     </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>

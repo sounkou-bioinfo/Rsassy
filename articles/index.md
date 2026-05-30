@@ -9,8 +9,6 @@
 
 - [API and
   Coordinates](https://sounkou-bioinfo.github.io/Rsassy/articles/api-and-coordinates.md):
-- [Searching R
-  Connections](https://sounkou-bioinfo.github.io/Rsassy/articles/connection-search.md):
 
 ### Native Builds
 

@@ -36,9 +36,9 @@ library(Rsassy)
 sassy_search("ATCGATCG", "GGGGATCGATCGTTTT", k = 1, alphabet = "dna")
 #> <sassy_matches> 3 matches
 #> pattern_idx text_idx text_start text_end pattern_start pattern_end cost strand  cigar
+#>           0        0          2       10             0           8    1      -   7=1X
 #>           0        0          4       12             0           8    0      +     8=
 #>           0        0          6       14             0           8    1      - 1=1X6=
-#>           0        0          2       10             0           8    1      -   7=1X
 ```
 
 The result is a `sassy_matches` data frame with `pattern_idx`,
@@ -61,9 +61,9 @@ region_matches <- sassy_search(
 region_matches
 #> <sassy_matches> 3 matches
 #> pattern_idx text_idx text_start text_end pattern_start pattern_end cost strand  cigar match_region
+#>           0        0          2       10             0           8    1      -   7=1X     ATCGATCC
 #>           0        0          4       12             0           8    0      +     8=     ATCGATCG
 #>           0        0          6       14             0           8    1      - 1=1X6=     AACGATCG
-#>           0        0          2       10             0           8    1      -   7=1X     ATCGATCC
 ```
 
 The print method can color `match_region` with simple ANSI escape
@@ -82,9 +82,9 @@ searcher <- sassy_searcher("dna")
 sassy_searcher_search(searcher, "ATCGATCG", "GGGGATCGATCGTTTT", k = 1)
 #> <sassy_matches> 3 matches
 #> pattern_idx text_idx text_start text_end pattern_start pattern_end cost strand  cigar
+#>           0        0          2       10             0           8    1      -   7=1X
 #>           0        0          4       12             0           8    0      +     8=
 #>           0        0          6       14             0           8    1      - 1=1X6=
-#>           0        0          2       10             0           8    1      -   7=1X
 ```
 
 Vector inputs search every pattern against every text. For larger
@@ -98,7 +98,7 @@ sassy_search(
   k = 1,
   alphabet = "iupac",
   rc = FALSE,
-  mode = "encoded_patterns"
+  strategy = "encoded_patterns"
 )
 #> <sassy_matches> 2 matches
 #> pattern_idx text_idx text_start text_end pattern_start pattern_end cost strand cigar
@@ -106,13 +106,13 @@ sassy_search(
 #>           1        0         11       14             0           3    0      +    3=
 ```
 
-`mode = "encoded_patterns"` (alias `"v2"`) is the R equivalent of CLI
-`--v2` for many equal-length short patterns. `batch_patterns` and
+`strategy = "encoded_patterns"` (alias `"v2"`) is the R equivalent of
+CLI `--v2` for many equal-length short patterns. `batch_patterns` and
 `encoded_patterns` use
 [Sassy](https://github.com/RagnarGrootKoerkamp/sassy)’s multi-pattern
 encoding, which in `sassy` 0.2.1 is implemented for IUPAC and equal
-byte-length patterns. Use `single` for other alphabets or mixed pattern
-lengths.
+byte-length patterns. The default `strategy = "pairwise"` is the general
+path for other alphabets and mixed pattern lengths.
 
 CLI-compatible orientation is available with `sam = TRUE`. This formats
 reverse-strand `match_region` and `cigar` in text direction, matching
@@ -150,25 +150,9 @@ For file-oriented colored `grep`, FASTA/FASTQ filtering, and large
 command-line pipelines, use the upstream
 [Sassy](https://github.com/RagnarGrootKoerkamp/sassy) CLI directly.
 
-Connections can be searched without an R-level read loop and return the
-same match columns with stream-relative coordinates:
-
-``` r
-
-tmp <- tempfile(fileext = ".gz")
-con <- gzfile(tmp, "wb")
-writeBin(charToRaw("CCCCATGCCCCTTT"), con)
-close(con)
-
-con <- gzfile(tmp, "rb")
-sassy_search_connection(c("ATG", "TTT"), con, k = 1, alphabet = "iupac", rc = FALSE, mode = "encoded_patterns")
-#> <sassy_matches> 2 matches
-#> pattern_idx text_idx text_start text_end pattern_start pattern_end cost strand cigar
-#>           0        0          4        7             0           3    0      +    3=
-#>           1        0         11       14             0           3    0      +    3=
-close(con)
-unlink(tmp)
-```
+FASTA/FASTQ file search should use a future record-oriented API rather
+than a raw connection stream, so coordinates and record identifiers can
+follow the upstream Sassy CLI semantics.
 
 Inspect the installed build:
 

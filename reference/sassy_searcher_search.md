@@ -16,7 +16,7 @@ sassy_searcher_search(
   k,
   all = FALSE,
   threads = 1L,
-  mode = "single",
+  strategy = "pairwise",
   match_region = FALSE,
   sam = FALSE
 )
@@ -29,9 +29,14 @@ sassy_searcher_search(
   A searcher created by
   [`sassy_searcher()`](https://sounkou-bioinfo.github.io/Rsassy/reference/sassy_searcher.md).
 
-- pattern, text:
+- pattern:
 
-  Raw vectors, character vectors, or lists of raw vectors / character
+  Raw vector, character vector, or list of raw vectors / character
+  scalars.
+
+- text:
+
+  Raw vector, character vector, or list of raw vectors / character
   scalars.
 
 - k:
@@ -40,20 +45,21 @@ sassy_searcher_search(
 
 - all:
 
-  If `FALSE`, return local-minimum matches. If `TRUE`, return all end
-  positions with score \<= `k`.
+  If `FALSE`, return the usual local-minimum matches. If `TRUE`, return
+  every end position with score \<= `k`; this can include overlapping
+  and nested candidate alignments and requires `strategy = "pairwise"`.
 
 - threads:
 
   Number of worker threads to request for bulk searches.
 
-- mode:
+- strategy:
 
-  Bulk search mode. `"single"` searches each pair independently;
-  `"batch_texts"` uses one text per SIMD lane. `"batch_patterns"` and
-  `"encoded_patterns"` (alias `"v2"`) use Sassy's multi-pattern
-  encoding, which in `sassy` 0.2.1 is implemented for
-  `alphabet = "iupac"` and equal byte-length patterns.
+  Search strategy. `"pairwise"` searches each pattern/text pair
+  independently and is the general default. `"batch_texts"` uses one
+  text per SIMD lane. `"batch_patterns"` and `"encoded_patterns"` (alias
+  `"v2"`) use Sassy's multi-pattern encoding, which in `sassy` 0.2.1 is
+  implemented for `alphabet = "iupac"` and equal byte-length patterns.
 
 - match_region:
 
@@ -71,4 +77,5 @@ sassy_searcher_search(
 A data frame with 0-based indices and coordinates: `pattern_idx`,
 `text_idx`, `text_start`, `text_end`, `pattern_start`, `pattern_end`,
 `cost`, `strand`, and `cigar`. If requested, also includes
-`match_region`.
+`match_region`. Rows are ordered by input text, then text start/end
+coordinate, then pattern index.

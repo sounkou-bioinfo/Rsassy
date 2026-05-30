@@ -35,7 +35,6 @@
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
 <li><a class="dropdown-item" href="../articles/getting-started.html">Getting Started with Rsassy</a></li>
     <li><a class="dropdown-item" href="../articles/api-and-coordinates.html">API and Coordinates</a></li>
-    <li><a class="dropdown-item" href="../articles/connection-search.html">Searching R Connections</a></li>
     <li><a class="dropdown-item" href="../articles/backend-selection.html">Backend Selection</a></li>
     <li><a class="dropdown-item" href="../articles/source-installation-and-vendoring.html">Development and Vendoring</a></li>
   </ul>
@@ -90,9 +89,9 @@ patterns in DNA, IUPAC, or ASCII text.</p>
 <span><span class="fu"><a href="../reference/sassy_search.html">sassy_search</a></span><span class="op">(</span><span class="st">"ATCGATCG"</span>, <span class="st">"GGGGATCGATCGTTTT"</span>, k <span class="op">=</span> <span class="fl">1</span>, alphabet <span class="op">=</span> <span class="st">"dna"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; &lt;sassy_matches&gt; 3 matches</span></span>
 <span><span class="co">#&gt; pattern_idx text_idx text_start text_end pattern_start pattern_end cost strand  cigar</span></span>
+<span><span class="co">#&gt;           0        0          2       10             0           8    1      -   7=1X</span></span>
 <span><span class="co">#&gt;           0        0          4       12             0           8    0      +     8=</span></span>
-<span><span class="co">#&gt;           0        0          6       14             0           8    1      - 1=1X6=</span></span>
-<span><span class="co">#&gt;           0        0          2       10             0           8    1      -   7=1X</span></span></code></pre></div>
+<span><span class="co">#&gt;           0        0          6       14             0           8    1      - 1=1X6=</span></span></code></pre></div>
 <p>The result is a <code>sassy_matches</code> data frame. Coordinates
 are 0-based and half-open.</p>
 </div>
@@ -104,9 +103,9 @@ are 0-based and half-open.</p>
 <span><span class="fu"><a href="../reference/sassy_searcher_search.html">sassy_searcher_search</a></span><span class="op">(</span><span class="va">searcher</span>, <span class="st">"ATCGATCG"</span>, <span class="st">"GGGGATCGATCGTTTT"</span>, k <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span>
 <span><span class="co">#&gt; &lt;sassy_matches&gt; 3 matches</span></span>
 <span><span class="co">#&gt; pattern_idx text_idx text_start text_end pattern_start pattern_end cost strand  cigar</span></span>
+<span><span class="co">#&gt;           0        0          2       10             0           8    1      -   7=1X</span></span>
 <span><span class="co">#&gt;           0        0          4       12             0           8    0      +     8=</span></span>
-<span><span class="co">#&gt;           0        0          6       14             0           8    1      - 1=1X6=</span></span>
-<span><span class="co">#&gt;           0        0          2       10             0           8    1      -   7=1X</span></span></code></pre></div>
+<span><span class="co">#&gt;           0        0          6       14             0           8    1      - 1=1X6=</span></span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="multiple-patterns-or-texts">Multiple patterns or texts<a class="anchor" aria-label="anchor" href="#multiple-patterns-or-texts"></a>
@@ -121,7 +120,7 @@ indices.</p>
 <span>  k <span class="op">=</span> <span class="fl">1</span>,</span>
 <span>  alphabet <span class="op">=</span> <span class="st">"iupac"</span>,</span>
 <span>  rc <span class="op">=</span> <span class="cn">FALSE</span>,</span>
-<span>  mode <span class="op">=</span> <span class="st">"encoded_patterns"</span></span>
+<span>  strategy <span class="op">=</span> <span class="st">"encoded_patterns"</span></span>
 <span><span class="op">)</span></span>
 <span><span class="co">#&gt; &lt;sassy_matches&gt; 2 matches</span></span>
 <span><span class="co">#&gt; pattern_idx text_idx text_start text_end pattern_start pattern_end cost strand cigar</span></span>

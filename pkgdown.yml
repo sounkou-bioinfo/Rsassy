@@ -4,10 +4,9 @@ pkgdown_sha: ~
 articles:
   api-and-coordinates: api-and-coordinates.html
   backend-selection: backend-selection.html
-  connection-search: connection-search.html
   getting-started: getting-started.html
   source-installation-and-vendoring: source-installation-and-vendoring.html
-last_built: 2026-05-30T17:57Z
+last_built: 2026-05-30T21:02Z
 urls:
   reference: https://sounkou-bioinfo.github.io/Rsassy/reference
   article: https://sounkou-bioinfo.github.io/Rsassy/articles

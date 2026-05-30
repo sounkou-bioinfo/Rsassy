@@ -35,7 +35,6 @@
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
 <li><a class="dropdown-item" href="../articles/getting-started.html">Getting Started with Rsassy</a></li>
     <li><a class="dropdown-item" href="../articles/api-and-coordinates.html">API and Coordinates</a></li>
-    <li><a class="dropdown-item" href="../articles/connection-search.html">Searching R Connections</a></li>
     <li><a class="dropdown-item" href="../articles/backend-selection.html">Backend Selection</a></li>
     <li><a class="dropdown-item" href="../articles/source-installation-and-vendoring.html">Development and Vendoring</a></li>
   </ul>
@@ -79,9 +78,6 @@
 <code><a href="../reference/sassy_searcher.html">sassy_searcher()</a></code> creates a reusable searcher.</li>
 <li>
 <code><a href="../reference/sassy_searcher_search.html">sassy_searcher_search()</a></code> searches with that object.</li>
-<li>
-<code><a href="../reference/sassy_search_connection.html">sassy_search_connection()</a></code> reads from an R
-connection.</li>
 <li>
 <code><a href="../reference/sassy_features.html">sassy_features()</a></code> prints backend/build information.</li>
 <li>
@@ -140,16 +136,18 @@ direction.</p>
 <span><span class="op">)</span></span>
 <span><span class="co">#&gt; &lt;sassy_matches&gt; 3 matches</span></span>
 <span><span class="co">#&gt; pattern_idx text_idx text_start text_end pattern_start pattern_end cost strand  cigar match_region</span></span>
+<span><span class="co">#&gt;           0        0          2       10             0           8    1      -   7=1X     ATCGATCC</span></span>
 <span><span class="co">#&gt;           0        0          4       12             0           8    0      +     8=     ATCGATCG</span></span>
-<span><span class="co">#&gt;           0        0          6       14             0           8    1      - 1=1X6=     AACGATCG</span></span>
-<span><span class="co">#&gt;           0        0          2       10             0           8    1      -   7=1X     ATCGATCC</span></span></code></pre></div>
+<span><span class="co">#&gt;           0        0          6       14             0           8    1      - 1=1X6=     AACGATCG</span></span></code></pre></div>
 </div>
 <div class="section level2">
-<h2 id="modes">Modes<a class="anchor" aria-label="anchor" href="#modes"></a>
+<h2 id="search-strategies">Search strategies<a class="anchor" aria-label="anchor" href="#search-strategies"></a>
 </h2>
+<p>The default <code>strategy = "pairwise"</code> searches each
+pattern/text pair independently. This is the general path and works with
+mixed pattern lengths and all alphabets. Other strategies are
+performance-oriented paths that call different Sassy kernels:</p>
 <ul>
-<li>
-<code>single</code>: independent pairwise searches.</li>
 <li>
 <code>batch_texts</code>: one pattern, multiple texts per
 batch.</li>
@@ -163,8 +161,7 @@ encoded-pattern path.</li>
 <p><code>batch_patterns</code> and <code>encoded_patterns</code> use
 Sassy’s multi-pattern encoding. In <code>sassy</code> 0.2.1 that
 encoding is implemented for the IUPAC profile and equal byte-length
-patterns. Use <code>single</code> for other alphabets or mixed pattern
-lengths.</p>
+patterns.</p>
 </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside>

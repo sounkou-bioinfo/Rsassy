@@ -20,14 +20,18 @@
 - Added CRAN-safe default Cargo parallelism and local fast Makefile
   targets.
 - Added vector and bulk search support for
-  [`sassy_searcher_search()`](https://sounkou-bioinfo.github.io/Rsassy/reference/sassy_searcher_search.md),
-  [`sassy_search()`](https://sounkou-bioinfo.github.io/Rsassy/reference/sassy_search.md),
+  [`sassy_searcher_search()`](https://sounkou-bioinfo.github.io/Rsassy/reference/sassy_searcher_search.md)
   and
-  [`sassy_search_connection()`](https://sounkou-bioinfo.github.io/Rsassy/reference/sassy_search_connection.md).
-- Added bulk modes `"single"`, `"batch_texts"`, `"batch_patterns"`, and
-  `"encoded_patterns"`/`"v2"`.
+  [`sassy_search()`](https://sounkou-bioinfo.github.io/Rsassy/reference/sassy_search.md).
+- Added bulk search strategies `"pairwise"`, `"batch_texts"`,
+  `"batch_patterns"`, and `"encoded_patterns"`/`"v2"`.
 - Added native Rust/Rayon threading for bulk search; wasm32 remains
   serial.
+- Improved threaded `strategy = "pairwise"` scheduling to split
+  Cartesian pattern/text tasks, which helps one-pattern-many-text
+  workloads.
+- Ordered returned matches by input text, then start/end coordinate,
+  then pattern index, matching record-oriented CLI expectations.
 - Added `match_region = TRUE`; reverse-strand regions are returned in
   pattern direction.
 - Added class `sassy_matches` and
@@ -38,8 +42,9 @@
 - Added
   [`sassy_crispr()`](https://sounkou-bioinfo.github.io/Rsassy/reference/sassy_crispr.md)
   for in-memory CRISPR guide target searches.
-- Added R connection input through
-  [`sassy_search_connection()`](https://sounkou-bioinfo.github.io/Rsassy/reference/sassy_search_connection.md).
+- Removed the raw R connection stream API before release; FASTA/FASTQ
+  input will use an explicit record-oriented file API rather than
+  stream-relative text coordinates.
 - Added result columns `pattern_idx`, `text_idx`, `text_start`,
   `text_end`, `pattern_start`, `pattern_end`, `cost`, `strand`, and
   `cigar`.
