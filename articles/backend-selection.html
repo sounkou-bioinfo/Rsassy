@@ -87,11 +87,11 @@ backend in this order:</p>
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/sassy_features.html">sassy_features</a></span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="co">#&gt; &lt;sassy_features&gt;</span></span>
 <span><span class="co">#&gt; dispatch: dynamic</span></span>
-<span><span class="co">#&gt; selected backend: avx512</span></span>
+<span><span class="co">#&gt; selected backend: avx2</span></span>
 <span><span class="co">#&gt; installed backends: scalar, avx2, avx512</span></span>
-<span><span class="co">#&gt; supported backends: scalar, avx2, avx512</span></span>
-<span><span class="co">#&gt; CPU: avx2=yes avx512f=yes neon=no</span></span>
-<span><span class="co">#&gt; Rust backend: avx512f (native_simd=yes)</span></span></code></pre></div>
+<span><span class="co">#&gt; supported backends: scalar, avx2</span></span>
+<span><span class="co">#&gt; CPU: avx2=yes avx512f=no neon=no</span></span>
+<span><span class="co">#&gt; Rust backend: avx2 (native_simd=yes)</span></span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="explicit-selection">Explicit selection<a class="anchor" aria-label="anchor" href="#explicit-selection"></a>
@@ -111,8 +111,8 @@ process.</p>
 <span><span class="co">#&gt; dispatch: dynamic</span></span>
 <span><span class="co">#&gt; selected backend: scalar</span></span>
 <span><span class="co">#&gt; installed backends: scalar, avx2, avx512</span></span>
-<span><span class="co">#&gt; supported backends: scalar, avx2, avx512</span></span>
-<span><span class="co">#&gt; CPU: avx2=yes avx512f=yes neon=no</span></span>
+<span><span class="co">#&gt; supported backends: scalar, avx2</span></span>
+<span><span class="co">#&gt; CPU: avx2=yes avx512f=no neon=no</span></span>
 <span><span class="co">#&gt; Rust backend: portable_scalar (native_simd=no)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/unlink.html" class="external-link">unlink</a></span><span class="op">(</span><span class="va">script</span><span class="op">)</span></span></code></pre></div>
 </div>
