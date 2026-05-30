@@ -112,7 +112,7 @@ preserving matches that cross chunk boundaries by keeping an overlap window.
 
 
 <dt id="arg-mode">mode<a class="anchor" aria-label="anchor" href="#arg-mode"></a></dt>
-<dd><p>Bulk search mode. <code>"single"</code> searches each pair independently; <code>"batch_texts"</code> uses one text per SIMD lane; <code>"batch_patterns"</code> uses one pattern per SIMD lane and currently requires <code>alphabet = "iupac"</code> plus equal pattern lengths; <code>"encoded_patterns"</code> (alias <code>"v2"</code>) uses Sassy's encoded-pattern path and currently also requires <code>alphabet = "iupac"</code> plus equal pattern lengths.</p></dd>
+<dd><p>Bulk search mode. <code>"single"</code> searches each pair independently; <code>"batch_texts"</code> uses one text per SIMD lane. <code>"batch_patterns"</code> and <code>"encoded_patterns"</code> (alias <code>"v2"</code>) use Sassy's multi-pattern encoding, which in <code>sassy</code> 0.2.1 is implemented for <code>alphabet = "iupac"</code> and equal byte-length patterns.</p></dd>
 
 
 <dt id="arg-chunk-size">chunk_size<a class="anchor" aria-label="anchor" href="#arg-chunk-size"></a></dt>

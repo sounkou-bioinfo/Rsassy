@@ -74,5 +74,7 @@ sassy_search(
 - `batch_patterns`: multiple equal-length patterns per batch.
 - `encoded_patterns` / `v2`: Sassy encoded-pattern path.
 
-The batched pattern modes currently require the IUPAC profile and equal
-pattern byte lengths.
+`batch_patterns` and `encoded_patterns` use Sassy’s multi-pattern
+encoding. In `sassy` 0.2.1 that encoding is implemented for the IUPAC
+profile and equal byte-length patterns. Use `single` for other alphabets
+or mixed pattern lengths.

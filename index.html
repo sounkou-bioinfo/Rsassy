@@ -124,7 +124,7 @@
 <span><span class="co">#&gt; pattern_idx text_idx text_start text_end pattern_start pattern_end cost strand cigar</span></span>
 <span><span class="co">#&gt;           0        0          4        7             0           3    0      +    3=</span></span>
 <span><span class="co">#&gt;           1        0         11       14             0           3    0      +    3=</span></span></code></pre></div>
-<p><code>mode = "encoded_patterns"</code> (alias <code>"v2"</code>) is the R equivalent of CLI <code>--v2</code> for many equal-length short patterns. <code>mode = "batch_patterns"</code> and <code>mode = "encoded_patterns"</code> currently require <code>alphabet = "iupac"</code> and equal pattern byte lengths.</p>
+<p><code>mode = "encoded_patterns"</code> (alias <code>"v2"</code>) is the R equivalent of CLI <code>--v2</code> for many equal-length short patterns. <code>batch_patterns</code> and <code>encoded_patterns</code> use Sassy’s multi-pattern encoding, which in <code>sassy</code> 0.2.1 is implemented for IUPAC and equal byte-length patterns. Use <code>single</code> for other alphabets or mixed pattern lengths.</p>
 <p>Connections can be searched without an R-level read loop and return the same match columns with stream-relative coordinates:</p>
 <div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">tmp</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempfile</a></span><span class="op">(</span>fileext <span class="op">=</span> <span class="st">".gz"</span><span class="op">)</span></span>

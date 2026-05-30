@@ -103,9 +103,10 @@ sassy_search(
 ```
 
 `mode = "encoded_patterns"` (alias `"v2"`) is the R equivalent of CLI
-`--v2` for many equal-length short patterns. `mode = "batch_patterns"`
-and `mode = "encoded_patterns"` currently require `alphabet = "iupac"`
-and equal pattern byte lengths.
+`--v2` for many equal-length short patterns. `batch_patterns` and
+`encoded_patterns` use Sassy’s multi-pattern encoding, which in `sassy`
+0.2.1 is implemented for IUPAC and equal byte-length patterns. Use
+`single` for other alphabets or mixed pattern lengths.
 
 Connections can be searched without an R-level read loop and return the
 same match columns with stream-relative coordinates:

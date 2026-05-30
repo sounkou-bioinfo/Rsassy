@@ -55,11 +55,10 @@ sassy_search(
 - mode:
 
   Bulk search mode. `"single"` searches each pair independently;
-  `"batch_texts"` uses one text per SIMD lane; `"batch_patterns"` uses
-  one pattern per SIMD lane and currently requires `alphabet = "iupac"`
-  plus equal pattern lengths; `"encoded_patterns"` (alias `"v2"`) uses
-  Sassy's encoded-pattern path and currently also requires
-  `alphabet = "iupac"` plus equal pattern lengths.
+  `"batch_texts"` uses one text per SIMD lane. `"batch_patterns"` and
+  `"encoded_patterns"` (alias `"v2"`) use Sassy's multi-pattern
+  encoding, which in `sassy` 0.2.1 is implemented for
+  `alphabet = "iupac"` and equal byte-length patterns.
 
 - match_region:
 
