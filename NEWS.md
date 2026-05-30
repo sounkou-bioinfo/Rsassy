@@ -32,6 +32,8 @@
 * Added `pattern_id` and `text_id` mapping in the C data-frame construction
   path.
 * Added native C/Rust CRISPR search support for in-memory guide/target lists.
+* Added committed upstream `sassy` CLI fixtures under `inst/extdata/` and tests
+  that compare Rsassy output against those generated ground-truth tables.
 * Removed the raw R connection stream API before release; FASTA/FASTQ input will
   use an explicit record-oriented file API rather than stream-relative text
   coordinates.

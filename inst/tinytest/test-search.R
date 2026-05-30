@@ -82,8 +82,15 @@ expect_true(all(c("pattern_id", "text_id") %in% names(id_matches)))
 expect_equal(id_matches$pattern_id, c("guide_a", "guide_b", "guide_a"))
 expect_equal(id_matches$text_id, c("record_a", "record_b", "record_b"))
 expect_error(sassy_search(list("ATG"), list("CCCCATG", "TTTATG"), 0, text_id = "record_a"))
+expect_error(sassy_search(list("ATG"), list("CCCCATG"), 0, pattern_id = c("p1", "p2")))
+expect_error(sassy_search(list("ATG"), list("CCCCATG"), 0, pattern_id = NA_character_))
+expect_error(sassy_search(list("ATG"), list("CCCCATG"), 0, text_id = NA_character_))
 expect_error(sassy_search("ATG", list("CCCCATG"), 0))
 expect_error(sassy_search(charToRaw("ATG"), list("CCCCATG"), 0))
+expect_error(sassy_search(list(NA_character_), list("CCCCATG"), 0))
+expect_error(sassy_search(list(1), list("CCCCATG"), 0))
+expect_error(sassy_search(list("ATG"), list(NA_character_), 0))
+expect_error(sassy_search(list("ATG"), list(1), 0))
 
 batch_text_matches <- sassy_search(
   list("ATG"),
@@ -129,10 +136,157 @@ expect_equal(crispr_matches$text_id, "chr1")
 expect_equal(crispr_matches$match_region, "ACGTAGG")
 crispr_no_ids <- sassy_crispr(list("ACGTNGG"), list("TTTACGTAGGTTT"), 0, rc = FALSE)
 expect_equal(names(crispr_no_ids), c("guide", "cost", "strand", "start", "end", "match_region", "cigar"))
+
+crispr_no_pam_edit <- sassy_crispr(list("ACGTNGG"), list("TTTACGTAAATTT"), 2, rc = FALSE)
+expect_equal(nrow(crispr_no_pam_edit), 0L)
 crispr_pam_edits <- sassy_crispr(list("ACGTNGG"), list("TTTACGTAAATTT"), 2, rc = FALSE, allow_pam_edits = TRUE)
 expect_true(any(crispr_pam_edits$match_region == "ACGTAAA"))
+
+crispr_rc <- sassy_crispr(list("ACGTNGG"), list("TTTCCNACGTTT"), 0, rc = TRUE)
+expect_equal(nrow(crispr_rc), 1L)
+expect_equal(crispr_rc$strand, "-")
+expect_equal(crispr_rc$start, 3)
+expect_equal(crispr_rc$end, 10)
+expect_equal(crispr_rc$match_region, "ACGTNGG")
+expect_equal(nrow(sassy_crispr(list("ACGTNGG"), list("TTTCCNACGTTT"), 0, rc = FALSE)), 0L)
+
+crispr_many_serial <- sassy_crispr(
+  list(charToRaw("ACGTNGG"), "TTTTNGG"),
+  list("TTTACGTAGGTTT", charToRaw("AAATTTTAGGAAA")),
+  0,
+  rc = FALSE,
+  pattern_id = c("g1", "g2"),
+  text_id = c("t1", "t2"),
+  threads = 1L
+)
+crispr_many_parallel <- sassy_crispr(
+  list(charToRaw("ACGTNGG"), "TTTTNGG"),
+  list("TTTACGTAGGTTT", charToRaw("AAATTTTAGGAAA")),
+  0,
+  rc = FALSE,
+  pattern_id = c("g1", "g2"),
+  text_id = c("t1", "t2"),
+  threads = 2L
+)
+expect_equal(crispr_many_parallel, crispr_many_serial)
+expect_equal(crispr_many_serial$pattern_id, c("g1", "g2"))
+expect_equal(crispr_many_serial$text_id, c("t1", "t2"))
+expect_equal(crispr_many_serial$guide, c("ACGTNGG", "TTTTNGG"))
+
+crispr_n_ok <- sassy_crispr(list("ACGTNGG"), list("TTTACGTNGGTTT"), 0, rc = FALSE, max_n_frac = 0.2)
+expect_equal(nrow(crispr_n_ok), 1L)
+crispr_n_filtered <- sassy_crispr(list("ACGTNGG"), list("TTTACGTNGGTTT"), 0, rc = FALSE, max_n_frac = 0)
+expect_equal(nrow(crispr_n_filtered), 0L)
+
 expect_error(sassy_crispr(list("ACGTNGG", "ACGTNGA"), list("TTTACGTAGGTTT"), 0, rc = FALSE))
 expect_error(sassy_crispr("ACGTNGG", list("TTTACGTAGGTTT"), 0, rc = FALSE))
+expect_error(sassy_crispr(list("ACGTNGG"), "TTTACGTAGGTTT", 0, rc = FALSE))
+expect_error(sassy_crispr(list(NA_character_), list("TTTACGTAGGTTT"), 0, rc = FALSE))
+expect_error(sassy_crispr(list(1), list("TTTACGTAGGTTT"), 0, rc = FALSE))
+expect_error(sassy_crispr(list(), list("TTTACGTAGGTTT"), 0, rc = FALSE))
+expect_error(sassy_crispr(list("ACGTNGG"), list("TTTACGTAGGTTT"), 0, pam_length = 0, rc = FALSE))
+expect_error(sassy_crispr(list("ACGTNGG"), list("TTTACGTAGGTTT"), 0, pam_length = 8, rc = FALSE))
+expect_error(sassy_crispr(list("ACGTNGG"), list("TTTACGTAGGTTT"), 0, max_n_frac = -0.1, rc = FALSE))
+expect_error(sassy_crispr(list("ACGTNGG"), list("TTTACGTAGGTTT"), 0, max_n_frac = NA_real_, rc = FALSE))
+expect_error(sassy_crispr(list("ACGTNGG"), list("TTTACGTAGGTTT"), 0, rc = FALSE, pattern_id = c("g1", "g2")))
+expect_error(sassy_crispr(list("ACGTNGG"), list("TTTACGTAGGTTT"), 0, rc = FALSE, pattern_id = NA_character_))
+expect_error(sassy_crispr(list("ACGTNGG"), list("TTTACGTAGGTTT"), 0, rc = FALSE, text_id = c("t1", "t2")))
+expect_error(sassy_crispr(list("ACGTNGG"), list("TTTACGTAGGTTT"), 0, rc = FALSE, text_id = NA_character_))
+expect_error(.Call(
+  "RC_sassy_crispr",
+  "ACGTNGG",
+  list("TTTACGTAGGTTT"),
+  0,
+  3L,
+  FALSE,
+  0.2,
+  FALSE,
+  1L,
+  NULL,
+  NULL,
+  PACKAGE = "Rsassy"
+))
+
+fixture_dir <- system.file("extdata", "cli-conformance", package = "Rsassy", mustWork = TRUE)
+read_fixture <- function(name) {
+  utils::read.delim(file.path(fixture_dir, name), stringsAsFactors = FALSE, check.names = FALSE)
+}
+normalize_fixture_search <- function(x) {
+  cols <- c("pat_id", "text_id", "cost", "strand", "start", "end", "match_region", "cigar")
+  x <- as.data.frame(x)[cols]
+  x$cost <- as.integer(x$cost)
+  x$start <- as.integer(x$start)
+  x$end <- as.integer(x$end)
+  for (col in setdiff(cols, c("cost", "start", "end"))) {
+    x[[col]] <- as.character(x[[col]])
+  }
+  row.names(x) <- NULL
+  x
+}
+search_to_fixture <- function(x, pattern_id, text_id) {
+  normalize_fixture_search(data.frame(
+    pat_id = pattern_id[x$pattern_idx + 1L],
+    text_id = text_id[x$text_idx + 1L],
+    cost = x$cost,
+    strand = x$strand,
+    start = x$text_start,
+    end = x$text_end,
+    match_region = x$match_region,
+    cigar = x$cigar,
+    stringsAsFactors = FALSE
+  ))
+}
+normalize_fixture_crispr <- function(x) {
+  cols <- c("guide", "text_id", "cost", "strand", "start", "end", "match_region", "cigar")
+  x <- as.data.frame(x)[cols]
+  x$cost <- as.integer(x$cost)
+  x$start <- as.integer(x$start)
+  x$end <- as.integer(x$end)
+  for (col in setdiff(cols, c("cost", "start", "end"))) {
+    x[[col]] <- as.character(x[[col]])
+  }
+  row.names(x) <- NULL
+  x
+}
+
+fixture_patterns <- list("ATG", "TTT")
+fixture_texts <- list("CCCCATGCCCCTTT")
+expect_equal(
+  search_to_fixture(
+    sassy_search(fixture_patterns, fixture_texts, 1, alphabet = "iupac", rc = FALSE, strategy = "pairwise", match_region = TRUE),
+    c("p_atg", "p_ttt"),
+    "t1"
+  ),
+  normalize_fixture_search(read_fixture("expected-search.tsv"))
+)
+expect_equal(
+  search_to_fixture(
+    sassy_search(fixture_patterns, fixture_texts, 1, alphabet = "iupac", rc = FALSE, strategy = "encoded_patterns", match_region = TRUE),
+    c("p_atg", "p_ttt"),
+    "t1"
+  ),
+  normalize_fixture_search(read_fixture("expected-search-v2.tsv"))
+)
+expect_equal(
+  search_to_fixture(
+    sassy_search(list("ACGA"), list("TTTCGTTT"), 0, alphabet = "dna", match_region = TRUE, sam = TRUE),
+    "pattern",
+    "chr1"
+  ),
+  normalize_fixture_search(read_fixture("expected-search-sam.tsv"))
+)
+expect_equal(
+  normalize_fixture_crispr(sassy_crispr(
+    list("ACGTNGG"),
+    list("TTTACGTAGGTTT", "TTTACGTAAATTT"),
+    2,
+    max_n_frac = 0.2,
+    rc = FALSE,
+    threads = 1L,
+    text_id = c("chr1", "chr2")
+  )),
+  normalize_fixture_crispr(read_fixture("expected-crispr.tsv"))
+)
 
 many_matches <- sassy_search(
   list("hello", "world"),

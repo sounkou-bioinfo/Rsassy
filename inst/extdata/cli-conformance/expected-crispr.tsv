@@ -1,0 +1,2 @@
+guide	text_id	cost	strand	start	end	match_region	cigar
+ACGTNGG	chr1	0	+	3	10	ACGTAGG	7=

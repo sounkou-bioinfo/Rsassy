@@ -1,0 +1,3 @@
+pat_id	text_id	cost	strand	start	end	match_region	cigar
+p_atg	t1	0	+	4	7	ATG	3=
+p_ttt	t1	0	+	11	14	TTT	3=

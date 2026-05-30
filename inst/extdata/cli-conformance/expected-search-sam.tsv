@@ -1,0 +1,2 @@
+pat_id	text_id	cost	strand	start	end	match_region	cigar
+pattern	chr1	0	-	2	6	TCGT	4=
