@@ -28,9 +28,9 @@ feature values.
 sassy_features()
 #> <sassy_features>
 #> dispatch: dynamic
-#> selected backend: avx2
+#> selected backend: avx512
 #> installed backends: scalar, avx2, avx512
-#> supported backends: scalar, avx2
-#> CPU: avx2=yes avx512f=no neon=no
-#> Rust backend: avx2 (native_simd=yes)
+#> supported backends: scalar, avx2, avx512
+#> CPU: avx2=yes avx512f=yes neon=no
+#> Rust backend: avx512f (native_simd=yes)
 ```

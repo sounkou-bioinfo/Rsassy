@@ -60,7 +60,7 @@
 <div class="page-header"><h1 id="rsassy">Rsassy<a class="anchor" aria-label="anchor" href="#rsassy"></a>
 </h1></div>
 <p><a href="https://sounkou-bioinfo.r-universe.dev/Rsassy" class="external-link"><img src="https://sounkou-bioinfo.r-universe.dev/badges/Rsassy" alt="R-universe"></a></p>
-<p>R bindings to Sassy through R’s native C API. Results are returned as data frames with 0-based coordinates and CIGAR strings.</p>
+<p>R bindings to <a href="https://github.com/RagnarGrootKoerkamp/sassy" class="external-link">Sassy</a> through R’s native C API. Results are returned as data frames with 0-based coordinates and CIGAR strings.</p>
 <div class="section level2">
 <h2 id="install">Install<a class="anchor" aria-label="anchor" href="#install"></a>
 </h2>
@@ -70,7 +70,7 @@
 <span>  <span class="st">"Rsassy"</span>,</span>
 <span>  repos <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"https://sounkou-bioinfo.r-universe.dev"</span>, <span class="st">"https://cloud.r-project.org"</span><span class="op">)</span></span>
 <span><span class="op">)</span></span></code></pre></div>
-<p>Source installs require Cargo/rustc &gt;= 1.91 and <code>xz</code>. Rust crates are vendored in <code>src/rust/vendor.tar.xz</code> for offline package builds. On Linux, macOS, and Windows, Rsassy installs multiple backend libraries when possible: scalar, AVX2, and AVX-512 on x86_64; scalar and NEON on arm64. Rsassy selects the best installed backend supported by the current CPU/runtime when the backend is first loaded.</p>
+<p>Source installs require Cargo/rustc &gt;= 1.91 and <code>xz</code>. Rust crates are vendored in <code>src/rust/vendor.tar.xz</code> for offline package builds. On Linux, macOS, and Windows, Rsassy installs multiple backend libraries when possible: scalar, AVX2, and AVX-512 on x86_64; scalar and NEON on arm64. The webR/WebAssembly build uses wasm SIMD128; see the <a href="https://sounkou-bioinfo.github.io/sassy-webR/" class="external-link">browser demo</a>. Rsassy selects the best installed backend supported by the current CPU/runtime when the backend is first loaded.</p>
 </div>
 <div class="section level2">
 <h2 id="usage">Usage<a class="anchor" aria-label="anchor" href="#usage"></a>
