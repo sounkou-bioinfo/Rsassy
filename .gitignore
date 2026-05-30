@@ -15,6 +15,3 @@ src/rust/Cargo.lock
 .webr-local-artifacts/
 webr-local-site/
 webr-repo/
-src/rust/vendor.tar.xz
-inst/AUTHORS
-inst/LICENCE.note

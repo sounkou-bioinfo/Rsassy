@@ -3,9 +3,8 @@
 # Vendor Rust crates for CRAN/offline installation.
 # Run from the Rsassy package root: Rscript tools/vendor-rust.R
 #
-# This vendors dependencies from crates.io using src/rust/Cargo.toml. The
-# generated src/rust/vendor.tar.xz is intentionally not tracked in git; create
-# it only for CRAN/offline source-package builds.
+# This vendors dependencies from crates.io using src/rust/Cargo.toml.
+# Commit the generated src/rust/vendor.tar.xz for offline package builds.
 
 root <- normalizePath(file.path("."), mustWork = TRUE)
 src <- file.path(root, "src")

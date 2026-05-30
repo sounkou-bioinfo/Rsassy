@@ -19,6 +19,7 @@
 ^webr-local-site$
 ^webr-repo$
 ^tools/webr-check\.cjs$
+^tools/python-conformance\.R$
 ^src/Makevars$
 ^src/Makevars\.win$
 ^src/\.cargo$

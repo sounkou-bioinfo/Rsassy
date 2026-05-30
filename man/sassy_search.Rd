@@ -30,7 +30,7 @@ sassy_search(
 
 \item{all}{If \code{FALSE}, return local-minimum matches. If \code{TRUE}, return all end positions with score <= \code{k}.}
 
-\item{threads}{Number of Rust/Rayon worker threads for native bulk searches. The current Rsassy wasm32/webR build path runs serially.}
+\item{threads}{Number of worker threads to request for bulk searches.}
 
 \item{mode}{Bulk search mode. \code{"single"} searches each pair independently; \code{"batch_texts"} uses one text per SIMD lane; \code{"batch_patterns"} uses one pattern per SIMD lane and currently requires \code{alphabet = "iupac"} plus equal pattern lengths; \code{"encoded_patterns"} (alias \code{"v2"}) uses Sassy's encoded-pattern path and currently also requires \code{alphabet = "iupac"} plus equal pattern lengths.}
 

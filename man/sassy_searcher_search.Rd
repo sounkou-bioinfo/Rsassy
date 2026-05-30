@@ -24,7 +24,7 @@ sassy_searcher_search(
 
 \item{all}{If \code{FALSE}, return local-minimum matches. If \code{TRUE}, return all end positions with score <= \code{k}.}
 
-\item{threads}{Number of Rust/Rayon worker threads for native bulk searches. The current Rsassy wasm32/webR build path runs serially.}
+\item{threads}{Number of worker threads to request for bulk searches.}
 
 \item{mode}{Bulk search mode. \code{"single"} searches each pair independently; \code{"batch_texts"} uses one text per SIMD lane; \code{"batch_patterns"} uses one pattern per SIMD lane and currently requires \code{alphabet = "iupac"} plus equal pattern lengths; \code{"encoded_patterns"} (alias \code{"v2"}) uses Sassy's encoded-pattern path and currently also requires \code{alphabet = "iupac"} plus equal pattern lengths.}
 
@@ -39,8 +39,5 @@ A data frame with 0-based indices and coordinates: \code{pattern_idx}, \code{tex
 \code{pattern} and \code{text} may be single sequences or vectors/lists of sequences.
 When vectors are supplied, every pattern is searched against every text and
 the returned \code{pattern_idx} and \code{text_idx} columns identify the 0-based input
-indices. Native builds can use Rayon threads for bulk search when
-\code{threads > 1}; the current Rsassy wasm32/webR build path keeps the same API
-but runs the bulk loop serially until threaded webR execution is explicitly
-enabled and validated.
+indices. Use \code{threads > 1} for larger batches.
 }

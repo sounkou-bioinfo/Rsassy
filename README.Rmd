@@ -26,23 +26,12 @@ install.packages(
 )
 ```
 
-Source installs require Cargo/rustc >= 1.91 and `xz`.
-
-From a checkout:
-
-```sh
-R CMD INSTALL .
-```
-
-Checkout installs resolve the `sassy` Rust crate from crates.io. For CRAN/offline
-source packages, run `make vendor-rust` before `R CMD build` to add
-`src/rust/vendor.tar.xz`; that generated bundle is not committed by default.
-Native Rsassy builds are multiversion by default: x86_64 builds install scalar,
-AVX2, and AVX-512 backends; arm64 builds install scalar and NEON backends.
-Rsassy selects
-the best installed backend supported by the current CPU/runtime when the native
-backend is first loaded. webR/WebAssembly builds use `wasm32-unknown-emscripten`
-with SIMD128.
+Source installs require Cargo/rustc >= 1.91 and `xz`. Rust crates are vendored
+in `src/rust/vendor.tar.xz` for offline package builds. On Linux, macOS, and
+Windows, Rsassy installs multiple backend libraries when possible: scalar, AVX2,
+and AVX-512 on x86_64; scalar and NEON on arm64. Rsassy selects the best
+installed backend supported by the current CPU/runtime when the backend is first
+loaded.
 
 ## Usage
 
@@ -85,10 +74,8 @@ searcher <- sassy_searcher("dna")
 sassy_searcher_search(searcher, "ATCGATCG", "GGGGATCGATCGTTTT", k = 1)
 ```
 
-Vector inputs search every pattern against every text. Native builds can use
-Rust/Rayon threads. The current Rsassy wasm32/webR build path keeps the same API
-but runs the bulk loop serially until threaded webR execution is explicitly
-enabled and validated.
+Vector inputs search every pattern against every text. For larger batches, use
+`threads > 1`.
 
 ```{r}
 sassy_search(
@@ -132,15 +119,20 @@ specific backend, call `sassy_set_backend()` before the first native Rsassy call
 in a fresh `Rscript` process. See `vignette("backend-selection", package =
 "Rsassy")` for the details.
 
-## Check
+## Development
 
-From the standalone Rsassy repository root:
+Common development commands from the repository root:
 
 ```sh
-make check
+make vendor-rust  # refresh src/rust/vendor.tar.xz after Rust dependency changes
+make rd           # regenerate NAMESPACE and man/*.Rd from R/search.R
+make readme       # regenerate README.md from README.Rmd
+make install      # install the package locally
+make test         # run tinytest tests
+make check        # build and run R CMD check
+make clean        # remove generated build artifacts
 ```
 
-Useful targets include `make readme`, `make rd`, `make install`, `make test`,
-`make vendor-rust`, and `make clean`. `make check` uses a CRAN-safe default of
-two Cargo build jobs; use `make check-fast` or `make CARGO_JOBS=10 check` for
-local multithreaded Cargo builds.
+`make check` uses a CRAN-safe default of two Cargo build jobs. Use
+`make check-fast` or `make CARGO_JOBS=10 check` for local multithreaded Cargo
+builds.

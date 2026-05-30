@@ -20,7 +20,7 @@ $(RUST_STAMP):
 	mkdir -p $(TARGET_DIR)/libgcc_mock; \
 	touch $(TARGET_DIR)/libgcc_mock/libgcc_eh.a; \
 	CARGO_JOBS="$${CARGO_BUILD_JOBS:-2}"; \
-	CARGO_FLAGS="-j $$CARGO_JOBS"; \
+	CARGO_FLAGS="--offline -j $$CARGO_JOBS"; \
 	RUSTFLAGS_BASE="$(RUSTFLAGS)"; \
 	RUST_TARGET="$(TARGET)"; \
 	CARGO_TARGET_FLAG="--target=$$RUST_TARGET"; \
@@ -31,18 +31,12 @@ $(RUST_STAMP):
 		aarch64-*) BUILD_BACKENDS="scalar,neon";; \
 		*) BUILD_BACKENDS="scalar";; \
 	esac; \
-	if [ -d ./vendor ]; then \
-		echo "=== Using offline Rust vendor directory ==="; \
-		mkdir -p $(CARGOTMP); \
-		cp rust/vendor-config.toml $(CARGOTMP)/config.toml; \
-		CARGO_FLAGS="--offline -j $$CARGO_JOBS"; \
-	elif [ -f ./rust/vendor.tar.xz ]; then \
-		echo "=== Using offline Rust vendor tarball ==="; \
-		tar xf rust/vendor.tar.xz; \
-		mkdir -p $(CARGOTMP); \
-		cp rust/vendor-config.toml $(CARGOTMP)/config.toml; \
-		CARGO_FLAGS="--offline -j $$CARGO_JOBS"; \
-	fi; \
+	if [ ! -f ./rust/vendor.tar.xz ]; then echo "ERROR: missing ./rust/vendor.tar.xz; run make vendor-rust" >&2; exit 1; fi; \
+	echo "=== Using offline Rust vendor tarball ==="; \
+	rm -rf ./vendor; \
+	tar xf ./rust/vendor.tar.xz; \
+	mkdir -p $(CARGOTMP); \
+	cp rust/vendor-config.toml $(CARGOTMP)/config.toml; \
 	export CARGO_HOME=$(CARGOTMP); \
 	export LIBRARY_PATH="$(LIBRARY_PATH);$(CURDIR)/$(TARGET_DIR)/libgcc_mock"; \
 	export PATH="$(PATH):$(HOME)/.cargo/bin"; \

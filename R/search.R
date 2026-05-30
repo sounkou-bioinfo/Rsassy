@@ -114,16 +114,13 @@ sassy_searcher <- function(alphabet = "dna", rc = TRUE, alpha = NULL) {
 #' `pattern` and `text` may be single sequences or vectors/lists of sequences.
 #' When vectors are supplied, every pattern is searched against every text and
 #' the returned `pattern_idx` and `text_idx` columns identify the 0-based input
-#' indices. Native builds can use Rayon threads for bulk search when
-#' `threads > 1`; the current Rsassy wasm32/webR build path keeps the same API
-#' but runs the bulk loop serially until threaded webR execution is explicitly
-#' enabled and validated.
+#' indices. Use `threads > 1` for larger batches.
 #'
 #' @param searcher A searcher created by [sassy_searcher()].
 #' @param pattern,text Raw vectors, character vectors, or lists of raw vectors / character scalars.
 #' @param k Maximum edit distance.
 #' @param all If `FALSE`, return local-minimum matches. If `TRUE`, return all end positions with score <= `k`.
-#' @param threads Number of Rust/Rayon worker threads for native bulk searches. The current Rsassy wasm32/webR build path runs serially.
+#' @param threads Number of worker threads to request for bulk searches.
 #' @param mode Bulk search mode. `"single"` searches each pair independently; `"batch_texts"` uses one text per SIMD lane; `"batch_patterns"` uses one pattern per SIMD lane and currently requires `alphabet = "iupac"` plus equal pattern lengths; `"encoded_patterns"` (alias `"v2"`) uses Sassy's encoded-pattern path and currently also requires `alphabet = "iupac"` plus equal pattern lengths.
 #' @param match_region If `TRUE`, include a `match_region` column. Reverse-strand
 #'   regions are reverse-complemented so the region and CIGAR are in the input

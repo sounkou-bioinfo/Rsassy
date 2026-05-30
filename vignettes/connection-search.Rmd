@@ -8,18 +8,14 @@ vignette: >
 ---
 
 ```{r, include = FALSE}
-knitr::opts_chunk$set(
-  collapse = TRUE,
-  comment = "#>",
-  eval = FALSE
-)
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+library(Rsassy)
 ```
 
-`sassy_search_connection()` searches an already-open readable R connection. This
-avoids an R-level `readBin()` loop and keeps a native overlap window so matches
-can cross chunk boundaries.
+`sassy_search_connection()` searches an open readable R connection. Matches may
+cross chunk boundaries.
 
-## Basic workflow
+## Example
 
 ```{r}
 tmp <- tempfile(fileext = ".gz")
@@ -40,14 +36,12 @@ close(con)
 unlink(tmp)
 ```
 
-The returned coordinates are relative to the full stream, not to individual
-chunks.
+Coordinates are relative to the full stream.
 
-## Chunking and overlap
+## Chunking
 
-`chunk_size` controls how many new bytes are read per native chunk. If
-`overlap = NULL`, the C shim computes a conservative overlap from the longest
-pattern, `k`, and the overhang setting.
+`chunk_size` controls the number of new bytes read per chunk. If `overlap` is
+`NULL`, Rsassy computes it from the longest pattern, `k`, and `alpha`.
 
 ```{r}
 con <- rawConnection(charToRaw("AAAAACGTAAAA"), "rb")
@@ -61,5 +55,3 @@ sassy_search_connection(
 )
 close(con)
 ```
-
-Open compressed connections, such as `gzfile()`, in binary mode when possible.

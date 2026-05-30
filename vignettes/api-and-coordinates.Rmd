@@ -8,45 +8,36 @@ vignette: >
 ---
 
 ```{r, include = FALSE}
-knitr::opts_chunk$set(
-  collapse = TRUE,
-  comment = "#>",
-  eval = FALSE
-)
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+library(Rsassy)
 ```
 
-`Rsassy` keeps the R surface small and close to the Rust API.
+## Functions
 
-## Main functions
-
-- `sassy_search()` is the convenience wrapper for one-off calls.
+- `sassy_search()` searches once.
 - `sassy_searcher()` creates a reusable searcher.
-- `sassy_searcher_search()` searches with a reusable searcher.
-- `sassy_search_connection()` streams from an R connection.
-- `sassy_features()` reports selected backend and CPU/build features.
-- `sassy_set_backend()` requests a backend before the first native call.
+- `sassy_searcher_search()` searches with that object.
+- `sassy_search_connection()` reads from an R connection.
+- `sassy_features()` prints backend/build information.
+- `sassy_set_backend()` selects a backend before first use.
 
 ## Coordinates
 
-Match coordinates are 0-based and half-open:
+Coordinates are 0-based and half-open.
 
-- `text_start`, `text_end` describe the interval in the input text.
-- `pattern_start`, `pattern_end` describe the interval in the input pattern.
-- `pattern_idx`, `text_idx` are 0-based indices into vector/list inputs.
-
-This mirrors the Rust crate and avoids repeated conversion at the native
-boundary.
+- `text_start`, `text_end`: interval in the text.
+- `pattern_start`, `pattern_end`: interval in the pattern.
+- `pattern_idx`, `text_idx`: input index for vector/list inputs.
 
 ```{r}
 matches <- sassy_search("ACGT", "TTACGTAA", k = 0, alphabet = "dna", rc = FALSE)
 matches[, c("text_start", "text_end", "pattern_start", "pattern_end", "cigar")]
 ```
 
-## Input types
+## Inputs
 
-`pattern` and `text` can be character vectors, raw vectors, or lists of raw
-vectors / character scalars. Use raw vectors when input is already byte-oriented
-and should not pass through R string encoding.
+`pattern` and `text` may be character vectors, raw vectors, or lists of raw
+vectors / character scalars. Use raw vectors for byte data.
 
 ```{r}
 sassy_search(charToRaw("ACGT"), charToRaw("TTACGTAA"), k = 0, alphabet = "dna")
@@ -54,9 +45,8 @@ sassy_search(charToRaw("ACGT"), charToRaw("TTACGTAA"), k = 0, alphabet = "dna")
 
 ## Match regions
 
-Set `match_region = TRUE` to include the matched text interval. Reverse-strand
-regions are reverse-complemented so the region and CIGAR are in the input
-pattern direction.
+`match_region = TRUE` adds the matched text interval. Reverse-strand regions are
+reverse-complemented to match the pattern direction.
 
 ```{r}
 sassy_search(
@@ -68,10 +58,12 @@ sassy_search(
 )
 ```
 
-## Search modes
+## Modes
 
-`mode = "single"` searches each pattern/text pair independently.
-`mode = "batch_texts"`, `mode = "batch_patterns"`, and
-`mode = "encoded_patterns"` expose Sassy's batched paths where applicable.
-The batched pattern modes currently require equal pattern byte lengths and the
-IUPAC profile.
+- `single`: independent pairwise searches.
+- `batch_texts`: one pattern, multiple texts per batch.
+- `batch_patterns`: multiple equal-length patterns per batch.
+- `encoded_patterns` / `v2`: Sassy encoded-pattern path.
+
+The batched pattern modes currently require the IUPAC profile and equal pattern
+byte lengths.

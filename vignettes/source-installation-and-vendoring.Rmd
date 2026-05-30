@@ -1,55 +1,33 @@
 ---
-title: "Source Installation and Vendoring"
+title: "Development and Vendoring"
 output: rmarkdown::html_vignette
 vignette: >
-  %\VignetteIndexEntry{Source Installation and Vendoring}
+  %\VignetteIndexEntry{Development and Vendoring}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
 
 ```{r, include = FALSE}
-knitr::opts_chunk$set(
-  collapse = TRUE,
-  comment = "#>",
-  eval = FALSE
-)
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
 ```
 
-`Rsassy` is a standalone R package. Its Rust crate depends on `sassy` from
-crates.io:
+Rsassy builds a small Rust crate during package installation. That crate depends
+on `sassy` from crates.io.
 
 ```toml
 sassy = { version = "0.2.1", default-features = false }
 ```
 
-## Checkout installs
+## Vendoring
 
-A normal checkout install may resolve Rust crates from crates.io:
+Rust sources are installed from the vendored bundle. Refresh it after Rust
+dependency changes:
 
-```sh
-R CMD INSTALL .
-```
-
-The package build uses R's standard native build hooks:
-
-- `configure` / `configure.win` generate `src/Makevars` files.
-- `src/Makevars.in` / `src/Makevars.win.in` build the Rust backend libraries.
-- `src/install.libs.R` installs backend libraries under `backends/` rather than
-  under R's main `libs/` directory.
-- `cleanup` removes generated build artifacts.
-
-## CRAN/offline source packages
-
-CRAN-style source package builds should not depend on network access during
-installation. Before building a release tarball for such a target, vendor Rust
-crates explicitly:
-
-```sh
+```{sh, eval=FALSE}
 make vendor-rust
-R CMD build .
 ```
 
-`make vendor-rust` writes:
+This updates:
 
 ```text
 src/rust/vendor.tar.xz
@@ -57,14 +35,28 @@ inst/AUTHORS
 inst/LICENCE.note
 ```
 
-These files are generated release artifacts. They are intentionally not tracked
-in the development repository by default.
+Package installation then runs Cargo in offline mode.
 
-## Build parallelism
+## Development commands
 
-`make check` uses a conservative Cargo job count suitable for shared check
-machines. For local development, increase it explicitly:
+```{sh, eval=FALSE}
+make rd       # regenerate NAMESPACE and man/*.Rd
+make readme   # regenerate README.md
+make install  # local install
+make test     # tinytest
+make check    # R CMD build + R CMD check
+make clean    # remove build artifacts
+```
 
-```sh
+`make check` uses two Cargo jobs by default. For local builds:
+
+```{sh, eval=FALSE}
 make CARGO_JOBS=10 check
 ```
+
+## R build hooks
+
+- `configure` / `configure.win` generate `src/Makevars` files.
+- `src/Makevars.in` / `src/Makevars.win.in` build the Rust libraries.
+- `src/install.libs.R` installs backend libraries under `backends/`.
+- `cleanup` removes generated files.
