@@ -17,7 +17,6 @@ library(Rsassy)
 - `sassy_search()` searches once.
 - `sassy_searcher()` creates a reusable searcher.
 - `sassy_searcher_search()` searches with that object.
-- `sassy_search_connection()` reads from an R connection.
 - `sassy_features()` prints backend/build information.
 - `sassy_set_backend()` selects a backend before first use.
 
@@ -58,13 +57,16 @@ sassy_search(
 )
 ```
 
-## Modes
+## Search strategies
 
-- `single`: independent pairwise searches.
+The default `strategy = "pairwise"` searches each pattern/text pair independently.
+This is the general path and works with mixed pattern lengths and all alphabets.
+Other strategies are performance-oriented paths that call different Sassy kernels:
+
 - `batch_texts`: one pattern, multiple texts per batch.
 - `batch_patterns`: multiple equal-length patterns per batch.
 - `encoded_patterns` / `v2`: Sassy encoded-pattern path.
 
 `batch_patterns` and `encoded_patterns` use Sassy's multi-pattern encoding. In
 `sassy` 0.2.1 that encoding is implemented for the IUPAC profile and equal
-byte-length patterns. Use `single` for other alphabets or mixed pattern lengths.
+byte-length patterns.

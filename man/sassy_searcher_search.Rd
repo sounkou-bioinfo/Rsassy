@@ -11,7 +11,7 @@ sassy_searcher_search(
   k,
   all = FALSE,
   threads = 1L,
-  mode = "single",
+  strategy = "pairwise",
   match_region = FALSE,
   sam = FALSE
 )
@@ -19,15 +19,23 @@ sassy_searcher_search(
 \arguments{
 \item{searcher}{A searcher created by \code{\link[=sassy_searcher]{sassy_searcher()}}.}
 
-\item{pattern, text}{Raw vectors, character vectors, or lists of raw vectors / character scalars.}
+\item{pattern}{Raw vector, character vector, or list of raw vectors / character scalars.}
+
+\item{text}{Raw vector, character vector, or list of raw vectors / character scalars.}
 
 \item{k}{Maximum edit distance.}
 
-\item{all}{If \code{FALSE}, return local-minimum matches. If \code{TRUE}, return all end positions with score <= \code{k}.}
+\item{all}{If \code{FALSE}, return the usual local-minimum matches. If \code{TRUE},
+return every end position with score <= \code{k}; this can include overlapping
+and nested candidate alignments and requires \code{strategy = "pairwise"}.}
 
 \item{threads}{Number of worker threads to request for bulk searches.}
 
-\item{mode}{Bulk search mode. \code{"single"} searches each pair independently; \code{"batch_texts"} uses one text per SIMD lane. \code{"batch_patterns"} and \code{"encoded_patterns"} (alias \code{"v2"}) use Sassy's multi-pattern encoding, which in \code{sassy} 0.2.1 is implemented for \code{alphabet = "iupac"} and equal byte-length patterns.}
+\item{strategy}{Search strategy. \code{"pairwise"} searches each pattern/text pair
+independently and is the general default. \code{"batch_texts"} uses one text per
+SIMD lane. \code{"batch_patterns"} and \code{"encoded_patterns"} (alias \code{"v2"}) use
+Sassy's multi-pattern encoding, which in \code{sassy} 0.2.1 is implemented for
+\code{alphabet = "iupac"} and equal byte-length patterns.}
 
 \item{match_region}{If \code{TRUE}, include a \code{match_region} column. Reverse-strand
 regions are reverse-complemented so the region and CIGAR are in the input
@@ -37,7 +45,7 @@ pattern direction.}
 text direction used by SAM and by the upstream \code{sassy --sam} output.}
 }
 \value{
-A data frame with 0-based indices and coordinates: \code{pattern_idx}, \code{text_idx}, \code{text_start}, \code{text_end}, \code{pattern_start}, \code{pattern_end}, \code{cost}, \code{strand}, and \code{cigar}. If requested, also includes \code{match_region}.
+A data frame with 0-based indices and coordinates: \code{pattern_idx}, \code{text_idx}, \code{text_start}, \code{text_end}, \code{pattern_start}, \code{pattern_end}, \code{cost}, \code{strand}, and \code{cigar}. If requested, also includes \code{match_region}. Rows are ordered by input text, then text start/end coordinate, then pattern index.
 }
 \description{
 \code{pattern} and \code{text} may be single sequences or vectors/lists of sequences.

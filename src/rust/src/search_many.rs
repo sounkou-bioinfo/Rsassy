@@ -5,33 +5,33 @@ use sassy::{Match as SassyMatch, Searcher};
 use std::os::raw::c_char;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum RsassySearchMode {
-    Single,
+pub(crate) enum RsassySearchStrategy {
+    Pairwise,
     BatchPatterns,
     BatchTexts,
     EncodedPatterns,
 }
 
-impl RsassySearchMode {
+impl RsassySearchStrategy {
     fn as_str(self) -> &'static str {
         match self {
-            RsassySearchMode::Single => "single",
-            RsassySearchMode::BatchPatterns => "batch_patterns",
-            RsassySearchMode::BatchTexts => "batch_texts",
-            RsassySearchMode::EncodedPatterns => "encoded_patterns",
+            RsassySearchStrategy::Pairwise => "pairwise",
+            RsassySearchStrategy::BatchPatterns => "batch_patterns",
+            RsassySearchStrategy::BatchTexts => "batch_texts",
+            RsassySearchStrategy::EncodedPatterns => "encoded_patterns",
         }
     }
 }
 
-pub(crate) fn parse_search_mode(mode: *const c_char) -> Result<RsassySearchMode, String> {
-    let mode = crate::cstr_arg(mode, "mode")?;
-    match mode {
-        "single" => Ok(RsassySearchMode::Single),
-        "batch_patterns" => Ok(RsassySearchMode::BatchPatterns),
-        "batch_texts" => Ok(RsassySearchMode::BatchTexts),
-        "encoded_patterns" | "v2" => Ok(RsassySearchMode::EncodedPatterns),
+pub(crate) fn parse_search_strategy(strategy: *const c_char) -> Result<RsassySearchStrategy, String> {
+    let strategy = crate::cstr_arg(strategy, "strategy")?;
+    match strategy {
+        "pairwise" => Ok(RsassySearchStrategy::Pairwise),
+        "batch_patterns" => Ok(RsassySearchStrategy::BatchPatterns),
+        "batch_texts" => Ok(RsassySearchStrategy::BatchTexts),
+        "encoded_patterns" | "v2" => Ok(RsassySearchStrategy::EncodedPatterns),
         _ => Err(format!(
-            "unsupported search mode: {mode}; expected 'single', 'batch_patterns', 'batch_texts', or 'encoded_patterns'"
+            "unsupported search strategy: {strategy}; expected 'pairwise', 'batch_texts', 'batch_patterns', 'encoded_patterns', or 'v2'"
         )),
     }
 }
@@ -42,13 +42,13 @@ fn serial_search_many<P: Profile>(
     texts: &[&[u8]],
     k: usize,
     all_matches: bool,
-    mode: RsassySearchMode,
+    strategy: RsassySearchStrategy,
 ) -> Vec<SassyMatch> {
     if patterns.is_empty() || texts.is_empty() {
         return Vec::new();
     }
 
-    if all_matches || mode == RsassySearchMode::Single {
+    if all_matches || strategy == RsassySearchStrategy::Pairwise {
         let mut out = Vec::new();
         for (pattern_idx, pattern) in patterns.iter().enumerate() {
             for (text_idx, text) in texts.iter().enumerate() {
@@ -67,9 +67,9 @@ fn serial_search_many<P: Profile>(
         return out;
     }
 
-    match mode {
-        RsassySearchMode::Single => unreachable!(),
-        RsassySearchMode::BatchPatterns => {
+    match strategy {
+        RsassySearchStrategy::Pairwise => unreachable!(),
+        RsassySearchStrategy::BatchPatterns => {
             let mut out = Vec::new();
             for (text_idx, text) in texts.iter().enumerate() {
                 let mut matches = searcher.search_patterns(patterns, *text, k);
@@ -80,7 +80,7 @@ fn serial_search_many<P: Profile>(
             }
             out
         }
-        RsassySearchMode::BatchTexts => {
+        RsassySearchStrategy::BatchTexts => {
             let mut out = Vec::new();
             for (pattern_idx, pattern) in patterns.iter().enumerate() {
                 let mut matches = searcher.search_texts(pattern, texts, k);
@@ -91,7 +91,7 @@ fn serial_search_many<P: Profile>(
             }
             out
         }
-        RsassySearchMode::EncodedPatterns => {
+        RsassySearchStrategy::EncodedPatterns => {
             search_encoded_patterns_many(searcher, patterns, texts, k, all_matches)
         }
     }
@@ -124,45 +124,74 @@ fn search_encoded_patterns_many<P: Profile>(
 }
 
 #[cfg(not(target_arch = "wasm32"))]
+const CARTESIAN_TASKS_PER_CHUNK: usize = 64;
+
+#[cfg(not(target_arch = "wasm32"))]
+fn parallel_search_cartesian<P: Profile>(
+    searcher: &Searcher<P>,
+    patterns: &[&[u8]],
+    texts: &[&[u8]],
+    k: usize,
+    all_matches: bool,
+) -> Vec<SassyMatch>
+where
+    Searcher<P>: Clone + Send,
+{
+    let n_texts = texts.len();
+    let pair_count = patterns.len() * n_texts;
+    let chunk_count = pair_count.div_ceil(CARTESIAN_TASKS_PER_CHUNK);
+
+    let mut chunks: Vec<(usize, Vec<SassyMatch>)> = (0..chunk_count)
+        .into_par_iter()
+        .map(|chunk_idx| {
+            let start = chunk_idx * CARTESIAN_TASKS_PER_CHUNK;
+            let end = (start + CARTESIAN_TASKS_PER_CHUNK).min(pair_count);
+            let mut local = searcher.clone();
+            let mut out = Vec::new();
+
+            for pair_idx in start..end {
+                let pattern_idx = pair_idx / n_texts;
+                let text_idx = pair_idx % n_texts;
+                let mut matches = if all_matches {
+                    local.search_all(patterns[pattern_idx], texts[text_idx], k)
+                } else {
+                    local.search(patterns[pattern_idx], texts[text_idx], k)
+                };
+                for m in &mut matches {
+                    m.pattern_idx = pattern_idx;
+                    m.text_idx = text_idx;
+                }
+                out.extend(matches);
+            }
+
+            (chunk_idx, out)
+        })
+        .collect();
+
+    chunks.sort_by_key(|(chunk_idx, _)| *chunk_idx);
+    chunks
+        .into_iter()
+        .flat_map(|(_, matches)| matches)
+        .collect()
+}
+
+#[cfg(not(target_arch = "wasm32"))]
 fn parallel_search_many<P: Profile>(
     searcher: &Searcher<P>,
     patterns: &[&[u8]],
     texts: &[&[u8]],
     k: usize,
     all_matches: bool,
-    mode: RsassySearchMode,
+    strategy: RsassySearchStrategy,
 ) -> Vec<SassyMatch>
 where
     Searcher<P>: Clone + Send,
 {
-    let mode = if all_matches {
-        RsassySearchMode::Single
-    } else {
-        mode
-    };
-
-    match mode {
-        RsassySearchMode::Single => (0..patterns.len())
-            .into_par_iter()
-            .flat_map_iter(|pattern_idx| {
-                let mut local = searcher.clone();
-                let mut out = Vec::new();
-                for (text_idx, text) in texts.iter().enumerate() {
-                    let mut matches = if all_matches {
-                        local.search_all(patterns[pattern_idx], *text, k)
-                    } else {
-                        local.search(patterns[pattern_idx], *text, k)
-                    };
-                    for m in &mut matches {
-                        m.pattern_idx = pattern_idx;
-                        m.text_idx = text_idx;
-                    }
-                    out.extend(matches);
-                }
-                out
-            })
-            .collect(),
-        RsassySearchMode::BatchPatterns => texts
+    match strategy {
+        RsassySearchStrategy::Pairwise => {
+            parallel_search_cartesian(searcher, patterns, texts, k, all_matches)
+        }
+        RsassySearchStrategy::BatchPatterns => texts
             .par_iter()
             .enumerate()
             .flat_map_iter(|(text_idx, text)| {
@@ -174,7 +203,7 @@ where
                 matches
             })
             .collect(),
-        RsassySearchMode::BatchTexts => patterns
+        RsassySearchStrategy::BatchTexts => patterns
             .par_iter()
             .enumerate()
             .flat_map_iter(|(pattern_idx, pattern)| {
@@ -186,25 +215,25 @@ where
                 matches
             })
             .collect(),
-        RsassySearchMode::EncodedPatterns => {
+        RsassySearchStrategy::EncodedPatterns => {
             let mut local = searcher.clone();
             search_encoded_patterns_many(&mut local, patterns, texts, k, all_matches)
         }
     }
 }
 
-pub(crate) fn validate_mode_for_profile(
+pub(crate) fn validate_strategy_for_profile(
     alphabet: &str,
-    mode: RsassySearchMode,
+    strategy: RsassySearchStrategy,
 ) -> Result<(), String> {
     if matches!(
-        mode,
-        RsassySearchMode::BatchPatterns | RsassySearchMode::EncodedPatterns
+        strategy,
+        RsassySearchStrategy::BatchPatterns | RsassySearchStrategy::EncodedPatterns
     ) && alphabet != "iupac"
     {
         return Err(format!(
-            "mode '{}' uses Sassy multi-pattern encoding and requires alphabet = 'iupac'",
-            mode.as_str()
+            "strategy '{}' uses Sassy multi-pattern encoding and requires alphabet = 'iupac'",
+            strategy.as_str()
         ));
     }
     Ok(())
@@ -217,7 +246,7 @@ pub(crate) fn search_many<P: Profile>(
     k: usize,
     all_matches: bool,
     threads: usize,
-    mode: RsassySearchMode,
+    strategy: RsassySearchStrategy,
 ) -> Result<Vec<SassyMatch>, String>
 where
     Searcher<P>: Clone + Send,
@@ -225,16 +254,22 @@ where
     if patterns.is_empty() || texts.is_empty() {
         return Ok(Vec::new());
     }
+    if all_matches && strategy != RsassySearchStrategy::Pairwise {
+        return Err(format!(
+            "all = TRUE returns every end position with score <= k and requires strategy = 'pairwise', not '{}'",
+            strategy.as_str()
+        ));
+    }
     if matches!(
-        mode,
-        RsassySearchMode::BatchPatterns | RsassySearchMode::EncodedPatterns
+        strategy,
+        RsassySearchStrategy::BatchPatterns | RsassySearchStrategy::EncodedPatterns
     ) && patterns
         .iter()
         .any(|pattern| pattern.len() != patterns[0].len())
     {
         return Err(format!(
-            "mode '{}' requires all patterns to have the same byte length",
-            mode.as_str()
+            "strategy '{}' requires all patterns to have the same byte length",
+            strategy.as_str()
         ));
     }
 
@@ -247,7 +282,7 @@ where
     if threads > 1 {
         if let Ok(pool) = ThreadPoolBuilder::new().num_threads(threads).build() {
             return Ok(pool.install(|| {
-                parallel_search_many(searcher, patterns, texts, k, all_matches, mode)
+                parallel_search_many(searcher, patterns, texts, k, all_matches, strategy)
             }));
         }
     }
@@ -258,6 +293,6 @@ where
         texts,
         k,
         all_matches,
-        mode,
+        strategy,
     ))
 }

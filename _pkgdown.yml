@@ -11,7 +11,6 @@ articles:
     navbar: ~
     contents:
       - api-and-coordinates
-      - connection-search
   - title: Native Builds
     navbar: ~
     contents:

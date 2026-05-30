@@ -3,7 +3,7 @@ mod search_many;
 
 use sassy::profiles::{Ascii, Dna, Iupac, Profile};
 use sassy::{Match as SassyMatch, Searcher, Strand};
-use search_many::{parse_search_mode, search_many, validate_mode_for_profile};
+use search_many::{parse_search_strategy, search_many, validate_strategy_for_profile};
 use std::cell::RefCell;
 use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_int};
@@ -397,7 +397,7 @@ pub extern "C" fn rsassy_searcher_search_many(
     k: usize,
     all_matches: bool,
     threads: usize,
-    mode: *const c_char,
+    strategy: *const c_char,
     include_match_region: bool,
     out_matches: *mut *mut RsassyMatch,
     out_len: *mut usize,
@@ -406,7 +406,7 @@ pub extern "C" fn rsassy_searcher_search_many(
         if searcher.is_null() {
             return Err("searcher pointer must not be NULL".to_string());
         }
-        let mode = parse_search_mode(mode)?;
+        let strategy = parse_search_strategy(strategy)?;
         // SAFETY: `byte_slices_from_raw_arrays` validates the top-level arrays
         // and each pointer/length pair before constructing borrowed slices.
         let patterns =
@@ -421,9 +421,9 @@ pub extern "C" fn rsassy_searcher_search_many(
 
         match &mut searcher.inner {
             SearcherType::Ascii(searcher) => {
-                validate_mode_for_profile("ascii", mode)?;
+                validate_strategy_for_profile("ascii", strategy)?;
                 let matches =
-                    search_many(searcher, &patterns, &texts, k, all_matches, threads, mode)?;
+                    search_many(searcher, &patterns, &texts, k, all_matches, threads, strategy)?;
                 write_match_array::<Ascii>(
                     matches,
                     &texts,
@@ -433,9 +433,9 @@ pub extern "C" fn rsassy_searcher_search_many(
                 )
             }
             SearcherType::Dna(searcher) => {
-                validate_mode_for_profile("dna", mode)?;
+                validate_strategy_for_profile("dna", strategy)?;
                 let matches =
-                    search_many(searcher, &patterns, &texts, k, all_matches, threads, mode)?;
+                    search_many(searcher, &patterns, &texts, k, all_matches, threads, strategy)?;
                 write_match_array::<Dna>(
                     matches,
                     &texts,
@@ -445,9 +445,9 @@ pub extern "C" fn rsassy_searcher_search_many(
                 )
             }
             SearcherType::Iupac(searcher) => {
-                validate_mode_for_profile("iupac", mode)?;
+                validate_strategy_for_profile("iupac", strategy)?;
                 let matches =
-                    search_many(searcher, &patterns, &texts, k, all_matches, threads, mode)?;
+                    search_many(searcher, &patterns, &texts, k, all_matches, threads, strategy)?;
                 write_match_array::<Iupac>(
                     matches,
                     &texts,

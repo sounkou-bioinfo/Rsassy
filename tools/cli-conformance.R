@@ -136,7 +136,7 @@ r_search <- search_to_cli(
     k = 1,
     alphabet = "iupac",
     rc = FALSE,
-    mode = "single",
+    strategy = "pairwise",
     match_region = TRUE
   ),
   pattern_ids = names(patterns),
@@ -162,7 +162,7 @@ r_v2 <- search_to_cli(
     k = 1,
     alphabet = "iupac",
     rc = FALSE,
-    mode = "encoded_patterns",
+    strategy = "encoded_patterns",
     match_region = TRUE
   ),
   pattern_ids = names(patterns),

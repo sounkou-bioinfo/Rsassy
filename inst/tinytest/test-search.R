@@ -20,7 +20,7 @@ expect_equal(matches$cigar, "4=")
 
 region_matches <- sassy_search("ATCGATCG", "GGGGATCGATCGTTTT", 1, alphabet = "dna", match_region = TRUE)
 expect_true("match_region" %in% names(region_matches))
-expect_equal(region_matches$match_region, c("ATCGATCG", "AACGATCG", "ATCGATCC"))
+expect_equal(region_matches$match_region, c("ATCGATCC", "ATCGATCG", "AACGATCG"))
 expect_true(!("match_region" %in% names(sassy_search("ATCG", "ATCG", 0, alphabet = "dna"))))
 
 rc_region <- sassy_search("ACGA", "TTTCGTTT", 0, alphabet = "dna", match_region = TRUE)
@@ -40,7 +40,7 @@ expect_true(any(grepl("match_region", print_output, fixed = TRUE)))
 colored_output <- capture.output(print(region_matches[1, ], color = TRUE))
 expect_true(any(grepl("\033", colored_output, fixed = TRUE)))
 expect_true(any(grepl("\033[32m", colored_output, fixed = TRUE)))
-sub_output <- capture.output(print(region_matches[2, ], color = TRUE))
+sub_output <- capture.output(print(region_matches[grepl("X", region_matches$cigar), ][1, ], color = TRUE))
 expect_true(any(grepl("\033[38;5;208m", sub_output, fixed = TRUE)))
 gap_matches <- sassy_search("ACGT", "AC", 2, alphabet = "dna", rc = FALSE, all = TRUE, match_region = TRUE)
 gap_output <- capture.output(print(gap_matches[gap_matches$cigar == "2=2I", ][1, ], color = TRUE))
@@ -61,7 +61,7 @@ bulk_matches <- sassy_search(
   1,
   alphabet = "iupac",
   rc = FALSE,
-  mode = "encoded_patterns"
+  strategy = "encoded_patterns"
 )
 expect_equal(nrow(bulk_matches), 2L)
 expect_equal(bulk_matches$pattern_idx, c(0L, 1L))
@@ -75,7 +75,7 @@ batch_text_matches <- sassy_search(
   0,
   alphabet = "iupac",
   rc = FALSE,
-  mode = "batch_texts"
+  strategy = "batch_texts"
 )
 expect_equal(nrow(batch_text_matches), 2L)
 expect_equal(batch_text_matches$pattern_idx, c(0L, 0L))
@@ -89,7 +89,7 @@ batch_pattern_matches <- sassy_search(
   0,
   alphabet = "iupac",
   rc = FALSE,
-  mode = "batch_patterns"
+  strategy = "batch_patterns"
 )
 expect_equal(nrow(batch_pattern_matches), 2L)
 expect_equal(batch_pattern_matches$pattern_idx, c(0L, 1L))
@@ -112,12 +112,46 @@ many_matches <- sassy_search(
   c("hello world", "the world wide web"),
   0,
   alphabet = "ascii",
-  mode = "single",
+  strategy = "pairwise",
   threads = 2L
 )
 expect_equal(nrow(many_matches), 3L)
 expect_true(all(c(0L, 1L) %in% many_matches$pattern_idx))
 expect_true(all(c(0L, 1L) %in% many_matches$text_idx))
+
+cartesian_texts <- rep("CCCC", 130L)
+cartesian_texts[c(2L, 65L, 130L)] <- c("ATGCCC", "CCATGCC", "GGGATG")
+cartesian_serial <- sassy_search("ATG", cartesian_texts, 0, alphabet = "dna", rc = FALSE, strategy = "pairwise", threads = 1L)
+cartesian_parallel <- sassy_search("ATG", cartesian_texts, 0, alphabet = "dna", rc = FALSE, strategy = "pairwise", threads = 4L)
+expect_equal(cartesian_parallel, cartesian_serial)
+expect_equal(cartesian_parallel$text_idx, c(1L, 64L, 129L))
+expect_error(sassy_search("ATG", "CCCCATG", 0, alphabet = "dna", rc = FALSE, strategy = "single"))
+expect_error(sassy_search("ATG", "CCCCATG", 0, alphabet = "dna", rc = FALSE, all = TRUE, strategy = "batch_texts"))
+expect_error(sassy_search("ATG", "CCCCATG", 0, alphabet = "dna", rc = FALSE, strategy = "not_a_strategy"))
+expect_error(.Call(
+  "RC_sassy_searcher_search",
+  sassy_searcher("dna", rc = FALSE),
+  "ATG",
+  "CCCCATG",
+  0,
+  TRUE,
+  1L,
+  "batch_texts",
+  FALSE,
+  PACKAGE = "Rsassy"
+))
+expect_error(.Call(
+  "RC_sassy_searcher_search",
+  sassy_searcher("dna", rc = FALSE),
+  "ATG",
+  "CCCCATG",
+  0,
+  FALSE,
+  1L,
+  "not_a_strategy",
+  FALSE,
+  PACKAGE = "Rsassy"
+))
 
 raw_matches <- sassy_search(charToRaw("ACGT"), charToRaw("TTACGTAA"), 0, alphabet = "dna", rc = FALSE)
 expect_equal(raw_matches, matches)
@@ -130,45 +164,9 @@ raw_list_matches <- sassy_search(
   rc = FALSE
 )
 expect_equal(nrow(raw_list_matches), 3L)
-expect_equal(raw_list_matches$pattern_idx, c(0L, 0L, 1L))
+expect_equal(raw_list_matches$pattern_idx, c(0L, 1L, 0L))
 expect_equal(raw_list_matches$text_idx, c(0L, 1L, 1L))
-expect_equal(raw_list_matches$text_start, c(4, 3, 0))
-
-con <- rawConnection(charToRaw("TTACGTAA"), "rb")
-connection_matches <- sassy_search_connection("ACGT", con, 0, alphabet = "dna", rc = FALSE, chunk_size = 3)
-close(con)
-expect_equal(connection_matches, matches)
-
-con <- rawConnection(charToRaw("TTACGTAA"), "rb")
-connection_region_matches <- sassy_search_connection("ACGT", con, 0, alphabet = "dna", rc = FALSE, chunk_size = 3, match_region = TRUE)
-close(con)
-expect_true("match_region" %in% names(connection_region_matches))
-expect_equal(connection_region_matches$match_region, "ACGT")
-
-boundary_text <- paste0("AAAA", "AC", "GT", "AAAA")
-con <- rawConnection(charToRaw(boundary_text), "rb")
-boundary_matches <- sassy_search_connection("ACGT", con, 0, alphabet = "dna", rc = FALSE, chunk_size = 6)
-close(con)
-expect_equal(nrow(boundary_matches), 1L)
-expect_equal(boundary_matches$text_start, 4)
-expect_equal(boundary_matches$text_end, 8)
-expect_equal(boundary_matches$cigar, "4=")
-
-con <- rawConnection(charToRaw("CCCCATGCCCCTTT"), "rb")
-connection_bulk_matches <- sassy_search_connection(
-  c("ATG", "TTT"),
-  con,
-  1,
-  alphabet = "iupac",
-  rc = FALSE,
-  mode = "encoded_patterns",
-  chunk_size = 8
-)
-close(con)
-expect_equal(nrow(connection_bulk_matches), 2L)
-expect_equal(connection_bulk_matches$pattern_idx, c(0L, 1L))
-expect_equal(connection_bulk_matches$text_idx, c(0L, 0L))
-expect_equal(connection_bulk_matches$text_start, c(4, 11))
+expect_equal(raw_list_matches$text_start, c(4, 0, 3))
 
 features <- sassy_features()
 expect_true(is.list(features))
@@ -210,4 +208,4 @@ unlink(c(backend_script, backend_out))
 
 expect_error(sassy_search("ACGT", "TTACGTAA", -1, alphabet = "dna"))
 expect_error(sassy_search("ACGT", "TTACGTAA", 0, alphabet = "dna", alpha = 0.5))
-expect_error(sassy_search(c("AT", "TTT"), "ATTT", 0, alphabet = "iupac", mode = "encoded_patterns"))
+expect_error(sassy_search(c("AT", "TTT"), "ATTT", 0, alphabet = "iupac", strategy = "encoded_patterns"))

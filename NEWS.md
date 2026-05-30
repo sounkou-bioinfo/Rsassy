@@ -12,11 +12,15 @@
   compiled features, and CPU/runtime capabilities.
 * Added CRAN-style Rust vendoring with an offline Cargo vendor tarball.
 * Added CRAN-safe default Cargo parallelism and local fast Makefile targets.
-* Added vector and bulk search support for `sassy_searcher_search()`,
-  `sassy_search()`, and `sassy_search_connection()`.
-* Added bulk modes `"single"`, `"batch_texts"`, `"batch_patterns"`, and
-  `"encoded_patterns"`/`"v2"`.
+* Added vector and bulk search support for `sassy_searcher_search()` and
+  `sassy_search()`.
+* Added bulk search strategies `"pairwise"`, `"batch_texts"`,
+  `"batch_patterns"`, and `"encoded_patterns"`/`"v2"`.
 * Added native Rust/Rayon threading for bulk search; wasm32 remains serial.
+* Improved threaded `strategy = "pairwise"` scheduling to split Cartesian
+  pattern/text tasks, which helps one-pattern-many-text workloads.
+* Ordered returned matches by input text, then start/end coordinate, then
+  pattern index, matching record-oriented CLI expectations.
 * Added `match_region = TRUE`; reverse-strand regions are returned in pattern
   direction.
 * Added class `sassy_matches` and `print.sassy_matches()`.
@@ -24,7 +28,9 @@
 * Added SAM-compatible reverse-strand formatting with `sam = TRUE` and
   `sassy_as_sam()`.
 * Added `sassy_crispr()` for in-memory CRISPR guide target searches.
-* Added R connection input through `sassy_search_connection()`.
+* Removed the raw R connection stream API before release; FASTA/FASTQ input will
+  use an explicit record-oriented file API rather than stream-relative text
+  coordinates.
 * Added result columns `pattern_idx`, `text_idx`, `text_start`, `text_end`,
   `pattern_start`, `pattern_end`, `cost`, `strand`, and `cigar`.
 * Added the R API functions `sassy_searcher()`, `sassy_searcher_search()`,

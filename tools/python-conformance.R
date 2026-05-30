@@ -106,8 +106,8 @@ expect_same(
 patterns <- c("hello", "world")
 texts <- c("hello world", "the world wide web")
 expect_same(
-  "search_many single",
-  sassy_search(patterns, texts, 0, alphabet = "ascii", mode = "single", threads = 2L),
+  "search_many pairwise",
+  sassy_search(patterns, texts, 0, alphabet = "ascii", strategy = "pairwise", threads = 2L),
   py_sassy$Searcher("ascii")$search_many(
     lapply(patterns, py_bytes),
     lapply(texts, py_bytes),

@@ -5,10 +5,6 @@
 #include <Rinternals.h>
 
 #include "rsassy_native.h"
-/* R_ext/Connections.h is R's experimental connection API. Rsassy keeps all
- * connection access isolated in this file so higher-level R code does not need
- * readBin()/readChar() loops for streaming input. */
-#include <R_ext/Connections.h>
 
 #include <math.h>
 #include <stdbool.h>
@@ -121,16 +117,6 @@ SEXP RC_sassy_searcher_new(SEXP alphabet_s, SEXP rc_s, SEXP alpha_s) {
 
     UNPROTECT(4);
     return xp;
-}
-
-static uintptr_t Rsassy_max_pattern_len(const struct RsassySeqViews *patterns) {
-    uintptr_t out = 0;
-    for (uintptr_t i = 0; i < patterns->n; i++) {
-        if (patterns->len[i] > out) {
-            out = patterns->len[i];
-        }
-    }
-    return out;
 }
 
 static struct RsassySeqView Rsassy_sequence_view(SEXP x, const char *arg) {
@@ -249,89 +235,75 @@ static RsassySearcher *Rsassy_searcher_from_xptr(SEXP xp) {
     return searcher;
 }
 
-static bool Rsassy_mode_is_encoded(const char *mode) {
-    return strcmp(mode, "encoded_patterns") == 0 || strcmp(mode, "v2") == 0;
+static bool Rsassy_strategy_is_pairwise(const char *strategy) {
+    return strcmp(strategy, "pairwise") == 0;
 }
 
-static bool Rsassy_mode_requires_equal_pattern_lengths(const char *mode) {
-    return strcmp(mode, "batch_patterns") == 0 || Rsassy_mode_is_encoded(mode);
+static bool Rsassy_strategy_is_known(const char *strategy) {
+    return Rsassy_strategy_is_pairwise(strategy) ||
+           strcmp(strategy, "batch_texts") == 0 ||
+           strcmp(strategy, "batch_patterns") == 0 ||
+           strcmp(strategy, "encoded_patterns") == 0 ||
+           strcmp(strategy, "v2") == 0;
 }
 
-static void Rsassy_check_equal_pattern_lengths(const struct RsassySeqViews *patterns, const char *mode) {
-    if (!Rsassy_mode_requires_equal_pattern_lengths(mode) || patterns->n <= 1) {
-        return;
+static void Rsassy_check_strategy_request(const char *strategy, int all) {
+    if (!Rsassy_strategy_is_known(strategy)) {
+        Rf_error("unsupported search strategy: %s; expected 'pairwise', 'batch_texts', 'batch_patterns', 'encoded_patterns', or 'v2'", strategy);
     }
-    uintptr_t len0 = patterns->len[0];
-    for (uintptr_t i = 1; i < patterns->n; i++) {
-        if (patterns->len[i] != len0) {
-            Rf_error("mode = '%s' requires all patterns to have the same byte length", mode);
-        }
+    if (all == TRUE && !Rsassy_strategy_is_pairwise(strategy)) {
+        Rf_error("all = TRUE maps to sassy::Searcher::search_all() and requires strategy = 'pairwise', not '%s'", strategy);
     }
 }
 
-struct RsassyMatchVec {
-    RsassyMatch *data;
-    uintptr_t len;
-    uintptr_t cap;
-};
-
-static char *Rsassy_strdup(const char *x) {
-    if (x == NULL) {
-        x = "";
-    }
-    size_t len = strlen(x);
-    char *out = (char *)malloc(len + 1);
-    if (out == NULL) {
-        Rf_error("failed to allocate CIGAR string");
-    }
-    memcpy(out, x, len + 1);
-    return out;
+static int Rsassy_cmp_uintptr(uintptr_t a, uintptr_t b) {
+    return (a > b) - (a < b);
 }
 
-static char *Rsassy_memdup(const char *x, uintptr_t len) {
-    char *out = (char *)malloc((size_t)(len == 0 ? 1 : len));
-    if (out == NULL) {
-        Rf_error("failed to allocate match_region string");
-    }
-    if (len > 0 && x != NULL) {
-        memcpy(out, x, (size_t)len);
-    }
-    return out;
+static int Rsassy_cmp_int32(int32_t a, int32_t b) {
+    return (a > b) - (a < b);
 }
 
-static void Rsassy_match_vec_free(struct RsassyMatchVec *vec) {
-    for (uintptr_t i = 0; i < vec->len; i++) {
-        free(vec->data[i].cigar);
-        vec->data[i].cigar = NULL;
-        free(vec->data[i].match_region);
-        vec->data[i].match_region = NULL;
-        vec->data[i].match_region_len = 0;
+static int Rsassy_cmp_cstr(const char *a, const char *b) {
+    if (a == NULL) {
+        a = "";
     }
-    free(vec->data);
-    vec->data = NULL;
-    vec->len = 0;
-    vec->cap = 0;
+    if (b == NULL) {
+        b = "";
+    }
+    return strcmp(a, b);
 }
 
-static void Rsassy_match_vec_push(struct RsassyMatchVec *vec, RsassyMatch match) {
-    if (vec->len == vec->cap) {
-        uintptr_t new_cap = vec->cap == 0 ? 64 : vec->cap * 2;
-        RsassyMatch *new_data = (RsassyMatch *)realloc(vec->data, (size_t)new_cap * sizeof(RsassyMatch));
-        if (new_data == NULL) {
-            free(match.cigar);
-            free(match.match_region);
-            Rsassy_match_vec_free(vec);
-            Rf_error("failed to allocate match accumulator");
-        }
-        vec->data = new_data;
-        vec->cap = new_cap;
-    }
-    vec->data[vec->len++] = match;
+static int Rsassy_match_compare_input_order(const void *lhs, const void *rhs) {
+    const RsassyMatch *a = (const RsassyMatch *)lhs;
+    const RsassyMatch *b = (const RsassyMatch *)rhs;
+    int cmp;
+
+    cmp = Rsassy_cmp_uintptr(a->text_idx, b->text_idx);
+    if (cmp != 0) return cmp;
+    cmp = Rsassy_cmp_uintptr(a->text_start, b->text_start);
+    if (cmp != 0) return cmp;
+    cmp = Rsassy_cmp_uintptr(a->text_end, b->text_end);
+    if (cmp != 0) return cmp;
+    cmp = Rsassy_cmp_uintptr(a->pattern_idx, b->pattern_idx);
+    if (cmp != 0) return cmp;
+    cmp = Rsassy_cmp_uintptr(a->pattern_start, b->pattern_start);
+    if (cmp != 0) return cmp;
+    cmp = Rsassy_cmp_uintptr(a->pattern_end, b->pattern_end);
+    if (cmp != 0) return cmp;
+    cmp = Rsassy_cmp_int32(a->cost, b->cost);
+    if (cmp != 0) return cmp;
+    cmp = ((int)a->strand > (int)b->strand) - ((int)a->strand < (int)b->strand);
+    if (cmp != 0) return cmp;
+    return Rsassy_cmp_cstr(a->cigar, b->cigar);
 }
 
-static SEXP Rsassy_matches_data_frame(const RsassyMatch *matches, uintptr_t n, bool include_match_region) {
+static SEXP Rsassy_matches_data_frame(RsassyMatch *matches, uintptr_t n, bool include_match_region) {
     if ((uint64_t)n > (uint64_t)INT_MAX) {
         Rf_error("too many matches to return as an R data frame");
+    }
+    if (n > 1) {
+        qsort(matches, (size_t)n, sizeof(RsassyMatch), Rsassy_match_compare_input_order);
     }
 
     int ncol = include_match_region ? 10 : 9;
@@ -423,7 +395,7 @@ SEXP RC_sassy_searcher_search(SEXP searcher_s,
                               SEXP k_s,
                               SEXP all_s,
                               SEXP threads_s,
-                              SEXP mode_s,
+                              SEXP strategy_s,
                               SEXP match_region_s) {
     Rsassy_init_backend();
     RsassySearcher *searcher = Rsassy_searcher_from_xptr(searcher_s);
@@ -431,16 +403,16 @@ SEXP RC_sassy_searcher_search(SEXP searcher_s,
     uintptr_t k = Rsassy_uintptr_scalar(k_s, "k", 0);
     int all = Rsassy_logical_scalar(all_s, "all");
     uintptr_t threads = Rsassy_uintptr_scalar(threads_s, "threads", 1);
-    const char *mode = Rsassy_string_scalar(mode_s, "mode");
+    const char *strategy = Rsassy_string_scalar(strategy_s, "strategy");
+    Rsassy_check_strategy_request(strategy, all);
     int include_match_region = Rsassy_logical_scalar(match_region_s, "match_region");
 
     struct RsassySeqViews patterns = Rsassy_sequences_view(pattern_s, "pattern");
     struct RsassySeqViews texts = Rsassy_sequences_view(text_s, "text");
-    Rsassy_check_equal_pattern_lengths(&patterns, mode);
 
     RsassyMatch *matches = NULL;
     uintptr_t n_matches = 0;
-    if (patterns.n == 1 && texts.n == 1 && threads == 1 && !Rsassy_mode_is_encoded(mode)) {
+    if (patterns.n == 1 && texts.n == 1 && threads == 1 && Rsassy_strategy_is_pairwise(strategy)) {
         if (rsassy_searcher_search(searcher,
                                    patterns.data[0],
                                    patterns.len[0],
@@ -464,7 +436,7 @@ SEXP RC_sassy_searcher_search(SEXP searcher_s,
                                         k,
                                         all == TRUE,
                                         threads,
-                                        mode,
+                                        strategy,
                                         include_match_region == TRUE,
                                         &matches,
                                         &n_matches) != 0) {
@@ -645,146 +617,11 @@ SEXP RC_sassy_features(void) {
     return out;
 }
 
-SEXP RC_sassy_searcher_search_connection(SEXP searcher_s,
-                                         SEXP pattern_s,
-                                         SEXP connection_s,
-                                         SEXP k_s,
-                                         SEXP all_s,
-                                         SEXP threads_s,
-                                         SEXP mode_s,
-                                         SEXP chunk_size_s,
-                                         SEXP overlap_s,
-                                         SEXP match_region_s) {
-    Rsassy_init_backend();
-    RsassySearcher *searcher = Rsassy_searcher_from_xptr(searcher_s);
-    struct RsassySeqViews patterns = Rsassy_sequences_view(pattern_s, "pattern");
-
-    uintptr_t k = Rsassy_uintptr_scalar(k_s, "k", 0);
-    int all = Rsassy_logical_scalar(all_s, "all");
-    uintptr_t threads = Rsassy_uintptr_scalar(threads_s, "threads", 1);
-    const char *mode = Rsassy_string_scalar(mode_s, "mode");
-    int include_match_region = Rsassy_logical_scalar(match_region_s, "match_region");
-    Rsassy_check_equal_pattern_lengths(&patterns, mode);
-
-    uintptr_t chunk_size = Rsassy_uintptr_scalar(chunk_size_s, "chunk_size", 1);
-    SEXP alpha_attr = Rf_getAttrib(searcher_s, Rf_install("alpha"));
-    double alpha = alpha_attr == R_NilValue ? NAN : Rf_asReal(alpha_attr);
-    uintptr_t max_pattern_len = Rsassy_max_pattern_len(&patterns);
-    uintptr_t overlap;
-    if (overlap_s == R_NilValue) {
-        uintptr_t multiplier = isnan(alpha) ? 1 : 2;
-        if (max_pattern_len > (SIZE_MAX - k) / multiplier) {
-            Rf_error("default overlap is too large for this platform");
-        }
-        overlap = multiplier * max_pattern_len + k;
-    } else {
-        overlap = Rsassy_uintptr_scalar(overlap_s, "overlap", 0);
-    }
-    if (overlap > SIZE_MAX - chunk_size) {
-        Rf_error("chunk_size + overlap is too large for this platform");
-    }
-
-    Rconnection con = R_GetConnection(connection_s);
-    if (con == NULL) {
-        Rf_error("con must be an R connection");
-    }
-    if (!con->isopen || !con->canread) {
-        Rf_error("con must be an open readable connection, preferably opened in binary mode");
-    }
-
-    uint8_t *window = (uint8_t *)malloc(chunk_size + overlap);
-    if (window == NULL) {
-        Rf_error("failed to allocate streaming buffer");
-    }
-
-    struct RsassyMatchVec acc = {0};
-    size_t carry_len = 0;
-    uintptr_t bytes_read_total = 0;
-
-    for (;;) {
-        size_t n_read = R_ReadConnection(con, window + carry_len, chunk_size);
-        if (n_read == 0) {
-            break;
-        }
-
-        uintptr_t chunk_start = bytes_read_total - (uintptr_t)carry_len;
-        uintptr_t new_bytes_start = bytes_read_total;
-        uintptr_t chunk_len = (uintptr_t)(carry_len + n_read);
-        bytes_read_total += (uintptr_t)n_read;
-
-        RsassyMatch *matches = NULL;
-        uintptr_t n_matches = 0;
-        int status;
-        if (patterns.n == 1 && threads == 1 && !Rsassy_mode_is_encoded(mode)) {
-            status = rsassy_searcher_search(searcher,
-                                            patterns.data[0],
-                                            patterns.len[0],
-                                            window,
-                                            chunk_len,
-                                            k,
-                                            all == TRUE,
-                                            include_match_region == TRUE,
-                                            &matches,
-                                            &n_matches);
-        } else {
-            const uint8_t *texts[1] = {window};
-            uintptr_t text_lens[1] = {chunk_len};
-            status = rsassy_searcher_search_many(searcher,
-                                                 patterns.data,
-                                                 patterns.len,
-                                                 patterns.n,
-                                                 texts,
-                                                 text_lens,
-                                                 1,
-                                                 k,
-                                                 all == TRUE,
-                                                 threads,
-                                                 mode,
-                                                 include_match_region == TRUE,
-                                                 &matches,
-                                                 &n_matches);
-        }
-        if (status != 0) {
-            free(window);
-            Rsassy_match_vec_free(&acc);
-            Rsassy_stop_last_error();
-        }
-
-        for (uintptr_t i = 0; i < n_matches; i++) {
-            RsassyMatch match = matches[i];
-            uintptr_t global_end = chunk_start + match.text_end;
-            if (global_end <= new_bytes_start) {
-                continue;
-            }
-            match.text_start += chunk_start;
-            match.text_end = global_end;
-            match.cigar = Rsassy_strdup(matches[i].cigar);
-            if (include_match_region == TRUE) {
-                match.match_region = Rsassy_memdup(matches[i].match_region, matches[i].match_region_len);
-                match.match_region_len = matches[i].match_region_len;
-            }
-            Rsassy_match_vec_push(&acc, match);
-        }
-        rsassy_matches_free(matches, n_matches);
-
-        carry_len = overlap < (size_t)chunk_len ? overlap : (size_t)chunk_len;
-        if (carry_len > 0) {
-            memmove(window, window + chunk_len - carry_len, carry_len);
-        }
-    }
-
-    free(window);
-    SEXP out = Rsassy_matches_data_frame(acc.data, acc.len, include_match_region == TRUE);
-    Rsassy_match_vec_free(&acc);
-    return out;
-}
-
 static const R_CallMethodDef CallEntries[] = {
     {"RC_sassy_features", (DL_FUNC)&RC_sassy_features, 0},
     {"RC_sassy_set_backend", (DL_FUNC)&RC_sassy_set_backend, 1},
     {"RC_sassy_searcher_new", (DL_FUNC)&RC_sassy_searcher_new, 3},
     {"RC_sassy_searcher_search", (DL_FUNC)&RC_sassy_searcher_search, 8},
-    {"RC_sassy_searcher_search_connection", (DL_FUNC)&RC_sassy_searcher_search_connection, 10},
     {NULL, NULL, 0}
 };
 

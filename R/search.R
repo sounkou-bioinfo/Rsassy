@@ -117,17 +117,24 @@ sassy_searcher <- function(alphabet = "dna", rc = TRUE, alpha = NULL) {
 #' indices. Use `threads > 1` for larger batches.
 #'
 #' @param searcher A searcher created by [sassy_searcher()].
-#' @param pattern,text Raw vectors, character vectors, or lists of raw vectors / character scalars.
+#' @param pattern Raw vector, character vector, or list of raw vectors / character scalars.
+#' @param text Raw vector, character vector, or list of raw vectors / character scalars.
 #' @param k Maximum edit distance.
-#' @param all If `FALSE`, return local-minimum matches. If `TRUE`, return all end positions with score <= `k`.
+#' @param all If `FALSE`, return the usual local-minimum matches. If `TRUE`,
+#'   return every end position with score <= `k`; this can include overlapping
+#'   and nested candidate alignments and requires `strategy = "pairwise"`.
 #' @param threads Number of worker threads to request for bulk searches.
-#' @param mode Bulk search mode. `"single"` searches each pair independently; `"batch_texts"` uses one text per SIMD lane. `"batch_patterns"` and `"encoded_patterns"` (alias `"v2"`) use Sassy's multi-pattern encoding, which in `sassy` 0.2.1 is implemented for `alphabet = "iupac"` and equal byte-length patterns.
+#' @param strategy Search strategy. `"pairwise"` searches each pattern/text pair
+#'   independently and is the general default. `"batch_texts"` uses one text per
+#'   SIMD lane. `"batch_patterns"` and `"encoded_patterns"` (alias `"v2"`) use
+#'   Sassy's multi-pattern encoding, which in `sassy` 0.2.1 is implemented for
+#'   `alphabet = "iupac"` and equal byte-length patterns.
 #' @param match_region If `TRUE`, include a `match_region` column. Reverse-strand
 #'   regions are reverse-complemented so the region and CIGAR are in the input
 #'   pattern direction.
 #' @param sam If `TRUE`, format reverse-strand `match_region` and `cigar` in the
 #'   text direction used by SAM and by the upstream `sassy --sam` output.
-#' @return A data frame with 0-based indices and coordinates: `pattern_idx`, `text_idx`, `text_start`, `text_end`, `pattern_start`, `pattern_end`, `cost`, `strand`, and `cigar`. If requested, also includes `match_region`.
+#' @return A data frame with 0-based indices and coordinates: `pattern_idx`, `text_idx`, `text_start`, `text_end`, `pattern_start`, `pattern_end`, `cost`, `strand`, and `cigar`. If requested, also includes `match_region`. Rows are ordered by input text, then text start/end coordinate, then pattern index.
 #' @export
 sassy_searcher_search <- function(searcher,
                                   pattern,
@@ -135,9 +142,13 @@ sassy_searcher_search <- function(searcher,
                                   k,
                                   all = FALSE,
                                   threads = 1L,
-                                  mode = "single",
+                                  strategy = "pairwise",
                                   match_region = FALSE,
                                   sam = FALSE) {
+  strategy <- sassy_strategy_scalar(strategy)
+  all <- sassy_logical_scalar(all, "all")
+  sam <- sassy_logical_scalar(sam, "sam")
+  sassy_check_all_strategy(all, strategy)
   out <- .Call(
     "RC_sassy_searcher_search",
     searcher,
@@ -146,11 +157,11 @@ sassy_searcher_search <- function(searcher,
     k,
     all,
     threads,
-    mode,
+    strategy,
     match_region,
     PACKAGE = "Rsassy"
   )
-  if (sassy_logical_scalar(sam, "sam")) {
+  if (sam) {
     out <- sassy_as_sam(out, alphabet = attr(searcher, "alphabet", exact = TRUE))
   }
   out
@@ -163,7 +174,7 @@ sassy_searcher_search <- function(searcher,
 #'
 #' @inheritParams sassy_searcher
 #' @inheritParams sassy_searcher_search
-#' @return A data frame with 0-based indices and coordinates: `pattern_idx`, `text_idx`, `text_start`, `text_end`, `pattern_start`, `pattern_end`, `cost`, `strand`, and `cigar`. If requested, also includes `match_region`.
+#' @return A data frame with 0-based indices and coordinates: `pattern_idx`, `text_idx`, `text_start`, `text_end`, `pattern_start`, `pattern_end`, `cost`, `strand`, and `cigar`. If requested, also includes `match_region`. Rows are ordered by input text, then text start/end coordinate, then pattern index.
 #' @examples
 #' sassy_search("ACGT", "TTACGTAA", 0, alphabet = "dna", rc = FALSE)
 #' @export
@@ -175,7 +186,7 @@ sassy_search <- function(pattern,
                          alpha = NULL,
                          all = FALSE,
                          threads = 1L,
-                         mode = "single",
+                         strategy = "pairwise",
                          match_region = FALSE,
                          sam = FALSE) {
   searcher <- sassy_searcher(alphabet = alphabet, rc = rc, alpha = alpha)
@@ -186,59 +197,10 @@ sassy_search <- function(pattern,
     k = k,
     all = all,
     threads = threads,
-    mode = mode,
+    strategy = strategy,
     match_region = match_region,
     sam = sam
   )
-}
-
-#' Search an R connection with 'sassy'
-#'
-#' Streams bytes from an already-open readable R connection through the C/R API
-#' boundary. This avoids an R-level `readBin()`/`readChar()` loop while still
-#' preserving matches that cross chunk boundaries by keeping an overlap window.
-#' `pattern` may be a single sequence or a vector/list of sequences, with
-#' `pattern_idx` identifying the 0-based input pattern index.
-#'
-#' @inheritParams sassy_search
-#' @param pattern Raw vector, character vector, or list of raw vectors / character scalars.
-#' @param con An open readable R connection, preferably opened in binary mode.
-#' @param chunk_size Number of new bytes to read per native chunk.
-#' @param overlap Number of bytes to carry from one chunk to the next. If `NULL`, C computes a default from the longest pattern, `k`, and `alpha`.
-#' @return A data frame of matches with coordinates relative to the full stream.
-#' @export
-sassy_search_connection <- function(pattern,
-                                    con,
-                                    k,
-                                    alphabet = "dna",
-                                    rc = TRUE,
-                                    alpha = NULL,
-                                    all = FALSE,
-                                    threads = 1L,
-                                    mode = "single",
-                                    chunk_size = 1024 * 1024,
-                                    overlap = NULL,
-                                    match_region = FALSE,
-                                    sam = FALSE) {
-  searcher <- sassy_searcher(alphabet = alphabet, rc = rc, alpha = alpha)
-  out <- .Call(
-    "RC_sassy_searcher_search_connection",
-    searcher,
-    pattern,
-    con,
-    k,
-    all,
-    threads,
-    mode,
-    chunk_size,
-    overlap,
-    match_region,
-    PACKAGE = "Rsassy"
-  )
-  if (sassy_logical_scalar(sam, "sam")) {
-    out <- sassy_as_sam(out, alphabet = alphabet)
-  }
-  out
 }
 
 #' Format matches in SAM-compatible text direction
@@ -343,7 +305,7 @@ sassy_crispr <- function(guide,
     rc = rc,
     all = TRUE,
     threads = threads,
-    mode = "single",
+    strategy = "pairwise",
     match_region = TRUE,
     sam = FALSE
   )
@@ -463,6 +425,30 @@ sassy_alphabet_scalar <- function(x) {
     stop("alphabet must be a non-missing character scalar", call. = FALSE)
   }
   tolower(x)
+}
+
+sassy_strategy_scalar <- function(x) {
+  if (!is.character(x) || length(x) != 1L || is.na(x)) {
+    stop("strategy must be a non-missing character scalar", call. = FALSE)
+  }
+  allowed <- c("pairwise", "batch_texts", "batch_patterns", "encoded_patterns", "v2")
+  if (!x %in% allowed) {
+    stop(
+      "strategy must be one of 'pairwise', 'batch_texts', 'batch_patterns', 'encoded_patterns', or 'v2'",
+      call. = FALSE
+    )
+  }
+  x
+}
+
+sassy_check_all_strategy <- function(all, strategy) {
+  if (isTRUE(all) && !identical(strategy, "pairwise")) {
+    stop(
+      "all = TRUE maps to sassy::Searcher::search_all() and requires strategy = 'pairwise'",
+      call. = FALSE
+    )
+  }
+  invisible(NULL)
 }
 
 sassy_whole_number <- function(x, arg, min = 0L) {

@@ -53,6 +53,6 @@ sassy_search(
   k = 1,
   alphabet = "iupac",
   rc = FALSE,
-  mode = "encoded_patterns"
+  strategy = "encoded_patterns"
 )
 ```

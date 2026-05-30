@@ -87,15 +87,16 @@ sassy_search(
   k = 1,
   alphabet = "iupac",
   rc = FALSE,
-  mode = "encoded_patterns"
+  strategy = "encoded_patterns"
 )
 ```
 
-`mode = "encoded_patterns"` (alias `"v2"`) is the R equivalent of CLI `--v2`
+`strategy = "encoded_patterns"` (alias `"v2"`) is the R equivalent of CLI `--v2`
 for many equal-length short patterns. `batch_patterns` and `encoded_patterns`
 use [Sassy](https://github.com/RagnarGrootKoerkamp/sassy)'s multi-pattern
 encoding, which in `sassy` 0.2.1 is implemented for IUPAC and equal byte-length
-patterns. Use `single` for other alphabets or mixed pattern lengths.
+patterns. The default `strategy = "pairwise"` is the general path for other
+alphabets and mixed pattern lengths.
 
 CLI-compatible orientation is available with `sam = TRUE`. This formats
 reverse-strand `match_region` and `cigar` in text direction, matching upstream
@@ -124,20 +125,9 @@ For file-oriented colored `grep`, FASTA/FASTQ filtering, and large command-line
 pipelines, use the upstream [Sassy](https://github.com/RagnarGrootKoerkamp/sassy)
 CLI directly.
 
-Connections can be searched without an R-level read loop and return the same
-match columns with stream-relative coordinates:
-
-```{r}
-tmp <- tempfile(fileext = ".gz")
-con <- gzfile(tmp, "wb")
-writeBin(charToRaw("CCCCATGCCCCTTT"), con)
-close(con)
-
-con <- gzfile(tmp, "rb")
-sassy_search_connection(c("ATG", "TTT"), con, k = 1, alphabet = "iupac", rc = FALSE, mode = "encoded_patterns")
-close(con)
-unlink(tmp)
-```
+FASTA/FASTQ file search should use a future record-oriented API rather than a
+raw connection stream, so coordinates and record identifiers can follow the
+upstream Sassy CLI semantics.
 
 Inspect the installed build:
 
