@@ -17,6 +17,7 @@ sassy_crispr(
   max_n_frac = 0.2,
   rc = TRUE,
   threads = 1L,
+  pattern_id = NULL,
   text_id = NULL
 )
 ```
@@ -25,13 +26,13 @@ sassy_crispr(
 
 - guide:
 
-  Character vector of guide sequences including the PAM suffix.
+  List of guide sequences including the PAM suffix. Each element must be
+  a raw vector or non-missing character scalar.
 
 - text:
 
-  Text sequences to search; a character vector, raw vector, or list of
-  raw/character scalars accepted by
-  [`sassy_search()`](https://sounkou-bioinfo.github.io/Rsassy/reference/sassy_search.md).
+  List of text sequences to search. Each element must be a raw vector or
+  non-missing character scalar.
 
 - k:
 
@@ -59,20 +60,28 @@ sassy_crispr(
 
   Number of worker threads to request.
 
+- pattern_id:
+
+  Optional guide/pattern identifiers. If supplied, must be a character
+  vector with one entry per guide and adds/replaces a `pattern_id`
+  column. Names on `guide` are not inspected.
+
 - text_id:
 
-  Optional text identifiers. Defaults to names on `text` when all names
-  are non-empty, otherwise `text_1`, `text_2`, ...
+  Optional text identifiers. If supplied, must be a character vector
+  with one entry per text and adds/replaces a `text_id` column. Names on
+  `text` are not inspected.
 
 ## Value
 
-A data frame with CLI-style columns: `guide`, `text_id`, `cost`,
-`strand`, `start`, `end`, `match_region`, and `cigar`.
+A data frame with CLI-style columns: `guide`, `cost`, `strand`, `start`,
+`end`, `match_region`, and `cigar`. If `pattern_id` or `text_id` are
+supplied, mapped identifier columns are included.
 
 ## Examples
 
 ``` r
-sassy_crispr("ACGTNGG", c(chr1 = "TTTACGTAGGTTT"), k = 0, rc = FALSE)
+sassy_crispr(list("ACGTNGG"), list("TTTACGTAGGTTT"), k = 0, rc = FALSE, text_id = "chr1")
 #>     guide text_id cost strand start end match_region cigar
 #> 1 ACGTNGG    chr1    0      +     3  10      ACGTAGG    7=
 ```

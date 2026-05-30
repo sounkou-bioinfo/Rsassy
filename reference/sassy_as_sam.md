@@ -33,7 +33,7 @@ to text direction.
 
 ``` r
 sassy_as_sam(
-  sassy_search("ACGA", "TTTCGTTT", 0, alphabet = "dna", match_region = TRUE),
+  sassy_search(list("ACGA"), list("TTTCGTTT"), 0, alphabet = "dna", match_region = TRUE),
   alphabet = "dna"
 )
 #> <sassy_matches> 1 match

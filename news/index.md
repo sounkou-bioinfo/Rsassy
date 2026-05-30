@@ -19,10 +19,13 @@
 - Added CRAN-style Rust vendoring with an offline Cargo vendor tarball.
 - Added CRAN-safe default Cargo parallelism and local fast Makefile
   targets.
-- Added vector and bulk search support for
+- Added list-based bulk search support for
   [`sassy_searcher_search()`](https://sounkou-bioinfo.github.io/Rsassy/reference/sassy_searcher_search.md)
   and
-  [`sassy_search()`](https://sounkou-bioinfo.github.io/Rsassy/reference/sassy_search.md).
+  [`sassy_search()`](https://sounkou-bioinfo.github.io/Rsassy/reference/sassy_search.md):
+  `pattern` and `text` are now lists of raw vectors or character
+  scalars, so each raw vector is one byte sequence and callers can mix
+  raw, character, and ALTREP-backed string elements.
 - Added bulk search strategies `"pairwise"`, `"batch_texts"`,
   `"batch_patterns"`, and `"encoded_patterns"`/`"v2"`.
 - Added native Rust/Rayon threading for bulk search; wasm32 remains
@@ -39,9 +42,10 @@
 - Added optional ANSI coloring for printed match regions.
 - Added SAM-compatible reverse-strand formatting with `sam = TRUE` and
   [`sassy_as_sam()`](https://sounkou-bioinfo.github.io/Rsassy/reference/sassy_as_sam.md).
-- Added
-  [`sassy_crispr()`](https://sounkou-bioinfo.github.io/Rsassy/reference/sassy_crispr.md)
-  for in-memory CRISPR guide target searches.
+- Added `pattern_id` and `text_id` mapping in the C data-frame
+  construction path.
+- Added native C/Rust CRISPR search support for in-memory guide/target
+  lists.
 - Removed the raw R connection stream API before release; FASTA/FASTQ
   input will use an explicit record-oriented file API rather than
   stream-relative text coordinates.

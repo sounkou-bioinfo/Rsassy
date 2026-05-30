@@ -101,7 +101,7 @@ the pattern.</li>
 vector/list inputs.</li>
 </ul>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">matches</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/sassy_search.html">sassy_search</a></span><span class="op">(</span><span class="st">"ACGT"</span>, <span class="st">"TTACGTAA"</span>, k <span class="op">=</span> <span class="fl">0</span>, alphabet <span class="op">=</span> <span class="st">"dna"</span>, rc <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
+<code class="sourceCode R"><span><span class="va">matches</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/sassy_search.html">sassy_search</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="st">"ACGT"</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="st">"TTACGTAA"</span><span class="op">)</span>, k <span class="op">=</span> <span class="fl">0</span>, alphabet <span class="op">=</span> <span class="st">"dna"</span>, rc <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
 <span><span class="va">matches</span><span class="op">[</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"text_start"</span>, <span class="st">"text_end"</span>, <span class="st">"pattern_start"</span>, <span class="st">"pattern_end"</span>, <span class="st">"cigar"</span><span class="op">)</span><span class="op">]</span></span>
 <span><span class="co">#&gt; &lt;sassy_matches&gt; 1 match</span></span>
 <span><span class="co">#&gt; text_start text_end pattern_start pattern_end cigar</span></span>
@@ -110,11 +110,13 @@ vector/list inputs.</li>
 <div class="section level2">
 <h2 id="inputs">Inputs<a class="anchor" aria-label="anchor" href="#inputs"></a>
 </h2>
-<p><code>pattern</code> and <code>text</code> may be character vectors,
-raw vectors, or lists of raw vectors / character scalars. Use raw
-vectors for byte data.</p>
+<p><code>pattern</code> and <code>text</code> are lists of sequence
+elements. Each element may be a raw vector or a non-missing character
+scalar. This keeps one raw vector as one sequence of bytes and lets
+callers mix raw bytes, ordinary strings, and ALTREP-backed string
+elements in the same input list.</p>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="../reference/sassy_search.html">sassy_search</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/rawConversion.html" class="external-link">charToRaw</a></span><span class="op">(</span><span class="st">"ACGT"</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/rawConversion.html" class="external-link">charToRaw</a></span><span class="op">(</span><span class="st">"TTACGTAA"</span><span class="op">)</span>, k <span class="op">=</span> <span class="fl">0</span>, alphabet <span class="op">=</span> <span class="st">"dna"</span><span class="op">)</span></span>
+<code class="sourceCode R"><span><span class="fu"><a href="../reference/sassy_search.html">sassy_search</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/rawConversion.html" class="external-link">charToRaw</a></span><span class="op">(</span><span class="st">"ACGT"</span><span class="op">)</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/rawConversion.html" class="external-link">charToRaw</a></span><span class="op">(</span><span class="st">"TTACGTAA"</span><span class="op">)</span><span class="op">)</span>, k <span class="op">=</span> <span class="fl">0</span>, alphabet <span class="op">=</span> <span class="st">"dna"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; &lt;sassy_matches&gt; 2 matches</span></span>
 <span><span class="co">#&gt; pattern_idx text_idx text_start text_end pattern_start pattern_end cost strand cigar</span></span>
 <span><span class="co">#&gt;           0        0          2        6             0           4    0      +    4=</span></span>
@@ -128,8 +130,8 @@ Reverse-strand regions are reverse-complemented to match the pattern
 direction.</p>
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/sassy_search.html">sassy_search</a></span><span class="op">(</span></span>
-<span>  <span class="st">"ATCGATCG"</span>,</span>
-<span>  <span class="st">"GGGGATCGATCGTTTT"</span>,</span>
+<span>  <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="st">"ATCGATCG"</span><span class="op">)</span>,</span>
+<span>  <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="st">"GGGGATCGATCGTTTT"</span><span class="op">)</span>,</span>
 <span>  k <span class="op">=</span> <span class="fl">1</span>,</span>
 <span>  alphabet <span class="op">=</span> <span class="st">"dna"</span>,</span>
 <span>  match_region <span class="op">=</span> <span class="cn">TRUE</span></span>

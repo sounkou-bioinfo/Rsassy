@@ -23,7 +23,7 @@ Coordinates are 0-based and half-open.
 
 ``` r
 
-matches <- sassy_search("ACGT", "TTACGTAA", k = 0, alphabet = "dna", rc = FALSE)
+matches <- sassy_search(list("ACGT"), list("TTACGTAA"), k = 0, alphabet = "dna", rc = FALSE)
 matches[, c("text_start", "text_end", "pattern_start", "pattern_end", "cigar")]
 #> <sassy_matches> 1 match
 #> text_start text_end pattern_start pattern_end cigar
@@ -32,12 +32,14 @@ matches[, c("text_start", "text_end", "pattern_start", "pattern_end", "cigar")]
 
 ## Inputs
 
-`pattern` and `text` may be character vectors, raw vectors, or lists of
-raw vectors / character scalars. Use raw vectors for byte data.
+`pattern` and `text` are lists of sequence elements. Each element may be
+a raw vector or a non-missing character scalar. This keeps one raw
+vector as one sequence of bytes and lets callers mix raw bytes, ordinary
+strings, and ALTREP-backed string elements in the same input list.
 
 ``` r
 
-sassy_search(charToRaw("ACGT"), charToRaw("TTACGTAA"), k = 0, alphabet = "dna")
+sassy_search(list(charToRaw("ACGT")), list(charToRaw("TTACGTAA")), k = 0, alphabet = "dna")
 #> <sassy_matches> 2 matches
 #> pattern_idx text_idx text_start text_end pattern_start pattern_end cost strand cigar
 #>           0        0          2        6             0           4    0      +    4=
@@ -52,8 +54,8 @@ regions are reverse-complemented to match the pattern direction.
 ``` r
 
 sassy_search(
-  "ATCGATCG",
-  "GGGGATCGATCGTTTT",
+  list("ATCGATCG"),
+  list("GGGGATCGATCGTTTT"),
   k = 1,
   alphabet = "dna",
   match_region = TRUE

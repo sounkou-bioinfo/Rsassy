@@ -64,6 +64,7 @@ the guide may have up to <code>k</code> edits.</p>
 <span>  max_n_frac <span class="op">=</span> <span class="fl">0.2</span>,</span>
 <span>  rc <span class="op">=</span> <span class="cn">TRUE</span>,</span>
 <span>  threads <span class="op">=</span> <span class="fl">1L</span>,</span>
+<span>  pattern_id <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  text_id <span class="op">=</span> <span class="cn">NULL</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
@@ -73,12 +74,13 @@ the guide may have up to <code>k</code> edits.</p>
 
 
 <dl><dt id="arg-guide">guide<a class="anchor" aria-label="anchor" href="#arg-guide"></a></dt>
-<dd><p>Character vector of guide sequences including the PAM suffix.</p></dd>
+<dd><p>List of guide sequences including the PAM suffix. Each element
+must be a raw vector or non-missing character scalar.</p></dd>
 
 
 <dt id="arg-text">text<a class="anchor" aria-label="anchor" href="#arg-text"></a></dt>
-<dd><p>Text sequences to search; a character vector, raw vector, or list
-of raw/character scalars accepted by <code><a href="sassy_search.html">sassy_search()</a></code>.</p></dd>
+<dd><p>List of text sequences to search. Each element must be a raw
+vector or non-missing character scalar.</p></dd>
 
 
 <dt id="arg-k">k<a class="anchor" aria-label="anchor" href="#arg-k"></a></dt>
@@ -107,20 +109,28 @@ the edit threshold outside the PAM.</p></dd>
 <dd><p>Number of worker threads to request.</p></dd>
 
 
+<dt id="arg-pattern-id">pattern_id<a class="anchor" aria-label="anchor" href="#arg-pattern-id"></a></dt>
+<dd><p>Optional guide/pattern identifiers. If supplied, must be a
+character vector with one entry per guide and adds/replaces a <code>pattern_id</code>
+column. Names on <code>guide</code> are not inspected.</p></dd>
+
+
 <dt id="arg-text-id">text_id<a class="anchor" aria-label="anchor" href="#arg-text-id"></a></dt>
-<dd><p>Optional text identifiers. Defaults to names on <code>text</code> when
-all names are non-empty, otherwise <code>text_1</code>, <code>text_2</code>, ...</p></dd>
+<dd><p>Optional text identifiers. If supplied, must be a character
+vector with one entry per text and adds/replaces a <code>text_id</code> column. Names
+on <code>text</code> are not inspected.</p></dd>
 
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
-    <p>A data frame with CLI-style columns: <code>guide</code>, <code>text_id</code>, <code>cost</code>,
-<code>strand</code>, <code>start</code>, <code>end</code>, <code>match_region</code>, and <code>cigar</code>.</p>
+    <p>A data frame with CLI-style columns: <code>guide</code>, <code>cost</code>, <code>strand</code>,
+<code>start</code>, <code>end</code>, <code>match_region</code>, and <code>cigar</code>. If <code>pattern_id</code> or <code>text_id</code>
+are supplied, mapped identifier columns are included.</p>
     </div>
 
     <div class="section level2">
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="fu">sassy_crispr</span><span class="op">(</span><span class="st">"ACGTNGG"</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>chr1 <span class="op">=</span> <span class="st">"TTTACGTAGGTTT"</span><span class="op">)</span>, k <span class="op">=</span> <span class="fl">0</span>, rc <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></span>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="fu">sassy_crispr</span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="st">"ACGTNGG"</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="st">"TTTACGTAGGTTT"</span><span class="op">)</span>, k <span class="op">=</span> <span class="fl">0</span>, rc <span class="op">=</span> <span class="cn">FALSE</span>, text_id <span class="op">=</span> <span class="st">"chr1"</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>     guide text_id cost strand start end match_region cigar</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 1 ACGTNGG    chr1    0      +     3  10      ACGTAGG    7=</span>
 </code></pre></div>

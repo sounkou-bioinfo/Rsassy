@@ -32,7 +32,7 @@ An external pointer with class `sassy_searcher`.
 
 ``` r
 searcher <- sassy_searcher("dna", rc = FALSE)
-sassy_searcher_search(searcher, "ACGT", "TTACGTAA", 0)
+sassy_searcher_search(searcher, list("ACGT"), list("TTACGTAA"), 0)
 #> <sassy_matches> 1 match
 #> pattern_idx text_idx text_start text_end pattern_start pattern_end cost strand cigar
 #>           0        0          2        6             0           4    0      +    4=

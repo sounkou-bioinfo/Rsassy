@@ -86,7 +86,7 @@ patterns in DNA, IUPAC, or ASCII text.</p>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/sounkou-bioinfo/Rsassy" class="external-link">Rsassy</a></span><span class="op">)</span></span>
 <span></span>
-<span><span class="fu"><a href="../reference/sassy_search.html">sassy_search</a></span><span class="op">(</span><span class="st">"ATCGATCG"</span>, <span class="st">"GGGGATCGATCGTTTT"</span>, k <span class="op">=</span> <span class="fl">1</span>, alphabet <span class="op">=</span> <span class="st">"dna"</span><span class="op">)</span></span>
+<span><span class="fu"><a href="../reference/sassy_search.html">sassy_search</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="st">"ATCGATCG"</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="st">"GGGGATCGATCGTTTT"</span><span class="op">)</span>, k <span class="op">=</span> <span class="fl">1</span>, alphabet <span class="op">=</span> <span class="st">"dna"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; &lt;sassy_matches&gt; 3 matches</span></span>
 <span><span class="co">#&gt; pattern_idx text_idx text_start text_end pattern_start pattern_end cost strand  cigar</span></span>
 <span><span class="co">#&gt;           0        0          2       10             0           8    1      -   7=1X</span></span>
@@ -100,7 +100,7 @@ are 0-based and half-open.</p>
 </h2>
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">searcher</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/sassy_searcher.html">sassy_searcher</a></span><span class="op">(</span><span class="st">"dna"</span>, rc <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
-<span><span class="fu"><a href="../reference/sassy_searcher_search.html">sassy_searcher_search</a></span><span class="op">(</span><span class="va">searcher</span>, <span class="st">"ATCGATCG"</span>, <span class="st">"GGGGATCGATCGTTTT"</span>, k <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span>
+<span><span class="fu"><a href="../reference/sassy_searcher_search.html">sassy_searcher_search</a></span><span class="op">(</span><span class="va">searcher</span>, <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="st">"ATCGATCG"</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="st">"GGGGATCGATCGTTTT"</span><span class="op">)</span>, k <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span>
 <span><span class="co">#&gt; &lt;sassy_matches&gt; 3 matches</span></span>
 <span><span class="co">#&gt; pattern_idx text_idx text_start text_end pattern_start pattern_end cost strand  cigar</span></span>
 <span><span class="co">#&gt;           0        0          2       10             0           8    1      -   7=1X</span></span>
@@ -110,13 +110,15 @@ are 0-based and half-open.</p>
 <div class="section level2">
 <h2 id="multiple-patterns-or-texts">Multiple patterns or texts<a class="anchor" aria-label="anchor" href="#multiple-patterns-or-texts"></a>
 </h2>
-<p>Vector inputs search every pattern against every text.
-<code>pattern_idx</code> and <code>text_idx</code> identify the input
-indices.</p>
+<p>List inputs search every pattern against every text. Each list
+element may be a raw vector or a non-missing character scalar, so
+callers can mix byte strings, regular strings, and ALTREP-backed string
+elements. <code>pattern_idx</code> and <code>text_idx</code> identify
+the input indices.</p>
 <div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/sassy_search.html">sassy_search</a></span><span class="op">(</span></span>
-<span>  <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"ATG"</span>, <span class="st">"TTT"</span><span class="op">)</span>,</span>
-<span>  <span class="st">"CCCCATGCCCCTTT"</span>,</span>
+<span>  <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="st">"ATG"</span>, <span class="fu"><a href="https://rdrr.io/r/base/rawConversion.html" class="external-link">charToRaw</a></span><span class="op">(</span><span class="st">"TTT"</span><span class="op">)</span><span class="op">)</span>,</span>
+<span>  <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="st">"CCCCATGCCCCTTT"</span><span class="op">)</span>,</span>
 <span>  k <span class="op">=</span> <span class="fl">1</span>,</span>
 <span>  alphabet <span class="op">=</span> <span class="st">"iupac"</span>,</span>
 <span>  rc <span class="op">=</span> <span class="cn">FALSE</span>,</span>

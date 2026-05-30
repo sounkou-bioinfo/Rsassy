@@ -54,7 +54,7 @@
 <li>Added <code><a href="../reference/sassy_features.html">sassy_features()</a></code> fields for installed backends, selected backend, compiled features, and CPU/runtime capabilities.</li>
 <li>Added CRAN-style Rust vendoring with an offline Cargo vendor tarball.</li>
 <li>Added CRAN-safe default Cargo parallelism and local fast Makefile targets.</li>
-<li>Added vector and bulk search support for <code><a href="../reference/sassy_searcher_search.html">sassy_searcher_search()</a></code> and <code><a href="../reference/sassy_search.html">sassy_search()</a></code>.</li>
+<li>Added list-based bulk search support for <code><a href="../reference/sassy_searcher_search.html">sassy_searcher_search()</a></code> and <code><a href="../reference/sassy_search.html">sassy_search()</a></code>: <code>pattern</code> and <code>text</code> are now lists of raw vectors or character scalars, so each raw vector is one byte sequence and callers can mix raw, character, and ALTREP-backed string elements.</li>
 <li>Added bulk search strategies <code>"pairwise"</code>, <code>"batch_texts"</code>, <code>"batch_patterns"</code>, and <code>"encoded_patterns"</code>/<code>"v2"</code>.</li>
 <li>Added native Rust/Rayon threading for bulk search; wasm32 remains serial.</li>
 <li>Improved threaded <code>strategy = "pairwise"</code> scheduling to split Cartesian pattern/text tasks, which helps one-pattern-many-text workloads.</li>
@@ -63,7 +63,8 @@
 <li>Added class <code>sassy_matches</code> and <code><a href="../reference/print.sassy_matches.html">print.sassy_matches()</a></code>.</li>
 <li>Added optional ANSI coloring for printed match regions.</li>
 <li>Added SAM-compatible reverse-strand formatting with <code>sam = TRUE</code> and <code><a href="../reference/sassy_as_sam.html">sassy_as_sam()</a></code>.</li>
-<li>Added <code><a href="../reference/sassy_crispr.html">sassy_crispr()</a></code> for in-memory CRISPR guide target searches.</li>
+<li>Added <code>pattern_id</code> and <code>text_id</code> mapping in the C data-frame construction path.</li>
+<li>Added native C/Rust CRISPR search support for in-memory guide/target lists.</li>
 <li>Removed the raw R connection stream API before release; FASTA/FASTQ input will use an explicit record-oriented file API rather than stream-relative text coordinates.</li>
 <li>Added result columns <code>pattern_idx</code>, <code>text_idx</code>, <code>text_start</code>, <code>text_end</code>, <code>pattern_start</code>, <code>pattern_end</code>, <code>cost</code>, <code>strand</code>, and <code>cigar</code>.</li>
 <li>Added the R API functions <code><a href="../reference/sassy_searcher.html">sassy_searcher()</a></code>, <code><a href="../reference/sassy_searcher_search.html">sassy_searcher_search()</a></code>, and <code><a href="../reference/sassy_search.html">sassy_search()</a></code>.</li>

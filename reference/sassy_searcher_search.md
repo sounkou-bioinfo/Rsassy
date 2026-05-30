@@ -1,8 +1,8 @@
 # Search with a reusable 'sassy' searcher
 
-`pattern` and `text` may be single sequences or vectors/lists of
-sequences. When vectors are supplied, every pattern is searched against
-every text and the returned `pattern_idx` and `text_idx` columns
+`pattern` and `text` must be lists of sequences. Each element must be a
+raw vector or a non-missing character scalar. Every pattern is searched
+against every text and the returned `pattern_idx` and `text_idx` columns
 identify the 0-based input indices. Use `threads > 1` for larger
 batches.
 
@@ -17,6 +17,8 @@ sassy_searcher_search(
   all = FALSE,
   threads = 1L,
   strategy = "pairwise",
+  pattern_id = NULL,
+  text_id = NULL,
   match_region = FALSE,
   sam = FALSE
 )
@@ -31,13 +33,11 @@ sassy_searcher_search(
 
 - pattern:
 
-  Raw vector, character vector, or list of raw vectors / character
-  scalars.
+  List of raw vectors or non-missing character scalars.
 
 - text:
 
-  Raw vector, character vector, or list of raw vectors / character
-  scalars.
+  List of raw vectors or non-missing character scalars.
 
 - k:
 
@@ -61,6 +61,18 @@ sassy_searcher_search(
   `"v2"`) use Sassy's multi-pattern encoding, which in `sassy` 0.2.1 is
   implemented for `alphabet = "iupac"` and equal byte-length patterns.
 
+- pattern_id:
+
+  Optional pattern identifiers. If supplied, must be a non-missing
+  character vector with one entry per pattern and adds/replaces a
+  `pattern_id` column. Names on `pattern` are not inspected.
+
+- text_id:
+
+  Optional text identifiers. If supplied, must be a non-missing
+  character vector with one entry per text and adds/replaces a `text_id`
+  column. Names on `text` are not inspected.
+
 - match_region:
 
   If `TRUE`, include a `match_region` column. Reverse-strand regions are
@@ -76,6 +88,7 @@ sassy_searcher_search(
 
 A data frame with 0-based indices and coordinates: `pattern_idx`,
 `text_idx`, `text_start`, `text_end`, `pattern_start`, `pattern_end`,
-`cost`, `strand`, and `cigar`. If requested, also includes
-`match_region`. Rows are ordered by input text, then text start/end
-coordinate, then pattern index.
+`cost`, `strand`, and `cigar`. If `pattern_id` or `text_id` are
+supplied, mapped identifier columns are included. If requested, also
+includes `match_region`. Rows are ordered by input text, then text
+start/end coordinate, then pattern index.

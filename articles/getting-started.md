@@ -19,7 +19,7 @@ install.packages(
 
 library(Rsassy)
 
-sassy_search("ATCGATCG", "GGGGATCGATCGTTTT", k = 1, alphabet = "dna")
+sassy_search(list("ATCGATCG"), list("GGGGATCGATCGTTTT"), k = 1, alphabet = "dna")
 #> <sassy_matches> 3 matches
 #> pattern_idx text_idx text_start text_end pattern_start pattern_end cost strand  cigar
 #>           0        0          2       10             0           8    1      -   7=1X
@@ -35,7 +35,7 @@ half-open.
 ``` r
 
 searcher <- sassy_searcher("dna", rc = TRUE)
-sassy_searcher_search(searcher, "ATCGATCG", "GGGGATCGATCGTTTT", k = 1)
+sassy_searcher_search(searcher, list("ATCGATCG"), list("GGGGATCGATCGTTTT"), k = 1)
 #> <sassy_matches> 3 matches
 #> pattern_idx text_idx text_start text_end pattern_start pattern_end cost strand  cigar
 #>           0        0          2       10             0           8    1      -   7=1X
@@ -45,14 +45,16 @@ sassy_searcher_search(searcher, "ATCGATCG", "GGGGATCGATCGTTTT", k = 1)
 
 ## Multiple patterns or texts
 
-Vector inputs search every pattern against every text. `pattern_idx` and
-`text_idx` identify the input indices.
+List inputs search every pattern against every text. Each list element
+may be a raw vector or a non-missing character scalar, so callers can
+mix byte strings, regular strings, and ALTREP-backed string elements.
+`pattern_idx` and `text_idx` identify the input indices.
 
 ``` r
 
 sassy_search(
-  c("ATG", "TTT"),
-  "CCCCATGCCCCTTT",
+  list("ATG", charToRaw("TTT")),
+  list("CCCCATGCCCCTTT"),
   k = 1,
   alphabet = "iupac",
   rc = FALSE,
