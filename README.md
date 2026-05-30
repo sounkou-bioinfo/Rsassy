@@ -24,7 +24,8 @@ Source installs require Cargo/rustc \>= 1.91 and `xz`. Rust crates are
 vendored in `src/rust/vendor.tar.xz` for offline package builds. On
 Linux, macOS, and Windows, Rsassy installs multiple backend libraries
 when possible: scalar, AVX2, and AVX-512 on x86_64; scalar and NEON on
-arm64. The webR/WebAssembly build uses wasm SIMD128. Rsassy selects the
+arm64. The webR/WebAssembly build uses wasm SIMD128; see the [browser
+demo](https://sounkou-bioinfo.github.io/sassy-webR/). Rsassy selects the
 best installed backend supported by the current CPU/runtime when the
 backend is first loaded.
 
