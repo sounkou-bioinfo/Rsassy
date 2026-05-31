@@ -1,11 +1,10 @@
-#define _GNU_SOURCE
-
 #include <R.h>
 #include <Rinternals.h>
 #include <R_ext/Rdynload.h>
 #include <R_ext/Altrep.h>
 
 #include "rsassy_native.h"
+#include "rsassy_platform.h"
 
 #include <limits.h>
 #include <math.h>
@@ -33,7 +32,7 @@ struct RsassySeqViews {
 };
 
 static void Rsassy_stop_last_error(void) {
-    const char *message = rsassy_last_error_message();
+    const char *message = Rsassy_native.last_error_message();
     if (message == NULL || message[0] == '\0') {
         message = "unknown Rsassy native error";
     }
@@ -43,7 +42,7 @@ static void Rsassy_stop_last_error(void) {
 static void Rsassy_searcher_finalizer(SEXP xp) {
     RsassySearcher *searcher = (RsassySearcher *)R_ExternalPtrAddr(xp);
     if (searcher != NULL) {
-        rsassy_searcher_free(searcher);
+        Rsassy_native.searcher_free(searcher);
         R_ClearExternalPtr(xp);
     }
 }
@@ -136,7 +135,7 @@ static SEXP Rsassy_fastx_batch_tag(void) {
 static void Rsassy_fastx_iter_finalizer(SEXP xp) {
     RsassyFastxIter *iter = (RsassyFastxIter *)R_ExternalPtrAddr(xp);
     if (iter != NULL) {
-        rsassy_fastx_iter_free(iter);
+        Rsassy_native.fastx_iter_free(iter);
         R_ClearExternalPtr(xp);
     }
 }
@@ -144,7 +143,7 @@ static void Rsassy_fastx_iter_finalizer(SEXP xp) {
 static void Rsassy_fastx_batch_finalizer(SEXP xp) {
     RsassyFastxBatch *batch = (RsassyFastxBatch *)R_ExternalPtrAddr(xp);
     if (batch != NULL) {
-        rsassy_fastx_batch_free(batch);
+        Rsassy_native.fastx_batch_free(batch);
         R_ClearExternalPtr(xp);
     }
 }
@@ -179,7 +178,7 @@ static R_xlen_t Rsassy_fastx_r_length(uintptr_t len, const char *what) {
 }
 
 static uintptr_t Rsassy_fastx_batch_n_checked(RsassyFastxBatch *batch) {
-    uintptr_t n = rsassy_fastx_batch_n(batch);
+    uintptr_t n = Rsassy_native.fastx_batch_n(batch);
     (void)Rsassy_fastx_r_length(n, "FASTX batch");
     return n;
 }
@@ -243,14 +242,14 @@ static SEXP Rsassy_fastx_raw_materialized(SEXP x) {
 
 static uintptr_t Rsassy_fastx_slice_len(RsassyFastxBatch *batch, int kind, uintptr_t index) {
     return kind == RSASSY_FASTX_BUFFER_SEQ
-               ? rsassy_fastx_batch_seq_len(batch, index)
-               : rsassy_fastx_batch_qual_len(batch, index);
+               ? Rsassy_native.fastx_batch_seq_len(batch, index)
+               : Rsassy_native.fastx_batch_qual_len(batch, index);
 }
 
 static const uint8_t *Rsassy_fastx_slice_ptr(RsassyFastxBatch *batch, int kind, uintptr_t index) {
     return kind == RSASSY_FASTX_BUFFER_SEQ
-               ? rsassy_fastx_batch_seq_ptr(batch, index)
-               : rsassy_fastx_batch_qual_ptr(batch, index);
+               ? Rsassy_native.fastx_batch_seq_ptr(batch, index)
+               : Rsassy_native.fastx_batch_qual_ptr(batch, index);
 }
 
 static R_xlen_t Rsassy_fastx_raw_Length(SEXP x) {
@@ -358,18 +357,18 @@ static SEXP Rsassy_fastx_id_Elt(SEXP x, R_xlen_t i) {
     if (i < 0 || (uint64_t)i >= (uint64_t)n) {
         Rf_error("FASTX id index out of bounds");
     }
-    uintptr_t len = rsassy_fastx_batch_id_len(batch, (uintptr_t)i);
+    uintptr_t len = Rsassy_native.fastx_batch_id_len(batch, (uintptr_t)i);
     if (len > (uintptr_t)INT_MAX) {
         Rf_error("FASTX id is too long for an R character string");
     }
     if (len == 0) {
         return R_BlankString;
     }
-    const uint8_t *ptr = rsassy_fastx_batch_id_ptr(batch, (uintptr_t)i);
+    const uint8_t *ptr = Rsassy_native.fastx_batch_id_ptr(batch, (uintptr_t)i);
     if (ptr == NULL && len > 0) {
         Rf_error("FASTX id pointer is unavailable");
     }
-    cetype_t encoding = rsassy_fastx_batch_id_utf8(batch, (uintptr_t)i) ? CE_UTF8 : CE_BYTES;
+    cetype_t encoding = Rsassy_native.fastx_batch_id_utf8(batch, (uintptr_t)i) ? CE_UTF8 : CE_BYTES;
     return Rf_mkCharLenCE((const char *)ptr, (int)len, encoding);
 }
 
@@ -420,7 +419,7 @@ static SEXP Rsassy_fastx_make_batch(RsassyFastxBatch *batch) {
 
     SEXP id = PROTECT(R_new_altrep(Rsassy_fastx_id_class, batch_xp, R_NilValue));
     SEXP seq = PROTECT(Rsassy_fastx_make_list_view(batch_xp, RSASSY_FASTX_BUFFER_SEQ));
-    SEXP qual = PROTECT(rsassy_fastx_batch_has_qual(batch) ? Rsassy_fastx_make_list_view(batch_xp, RSASSY_FASTX_BUFFER_QUAL) : R_NilValue);
+    SEXP qual = PROTECT(Rsassy_native.fastx_batch_has_qual(batch) ? Rsassy_fastx_make_list_view(batch_xp, RSASSY_FASTX_BUFFER_QUAL) : R_NilValue);
 
     SEXP out = PROTECT(Rf_allocVector(VECSXP, 3));
     SEXP names = PROTECT(Rf_allocVector(STRSXP, 3));
@@ -446,7 +445,7 @@ SEXP RC_sassy_fastx_iter_new(SEXP path_s, SEXP batch_records_s, SEXP include_qua
     int include_qual = Rsassy_logical_scalar(include_qual_s, "include_qual");
 
     RsassyFastxIter *iter = NULL;
-    if (rsassy_fastx_iter_new(path, batch_records, include_qual == TRUE, &iter) != 0) {
+    if (Rsassy_native.fastx_iter_new(path, batch_records, include_qual == TRUE, &iter) != 0) {
         Rsassy_stop_last_error();
     }
 
@@ -461,7 +460,7 @@ SEXP RC_sassy_fastx_iter_new(SEXP path_s, SEXP batch_records_s, SEXP include_qua
 SEXP RC_sassy_fastx_next(SEXP iter_s) {
     RsassyFastxIter *iter = Rsassy_fastx_iter_from_xptr(iter_s);
     RsassyFastxBatch *batch = NULL;
-    if (rsassy_fastx_iter_next(iter, &batch) != 0) {
+    if (Rsassy_native.fastx_iter_next(iter, &batch) != 0) {
         Rsassy_stop_last_error();
     }
     if (batch == NULL) {
@@ -478,7 +477,7 @@ SEXP RC_sassy_searcher_new(SEXP alphabet_s, SEXP rc_s, SEXP alpha_s) {
     float alpha_f = isnan(alpha) ? NAN : (float)alpha;
 
     RsassySearcher *searcher = NULL;
-    if (rsassy_searcher_new(alphabet, rc == TRUE, alpha_f, &searcher) != 0) {
+    if (Rsassy_native.searcher_new(alphabet, rc == TRUE, alpha_f, &searcher) != 0) {
         Rsassy_stop_last_error();
     }
 
@@ -883,7 +882,7 @@ SEXP RC_sassy_searcher_search(SEXP searcher_s,
     RsassyMatch *matches = NULL;
     uintptr_t n_matches = 0;
     if (patterns.n == 1 && texts.n == 1 && threads == 1 && Rsassy_strategy_is_pairwise(strategy)) {
-        if (rsassy_searcher_search(searcher,
+        if (Rsassy_native.searcher_search(searcher,
                                    patterns.data[0],
                                    patterns.len[0],
                                    texts.data[0],
@@ -896,7 +895,7 @@ SEXP RC_sassy_searcher_search(SEXP searcher_s,
             Rsassy_stop_last_error();
         }
     } else {
-        if (rsassy_searcher_search_many(searcher,
+        if (Rsassy_native.searcher_search_many(searcher,
                                         patterns.data,
                                         patterns.len,
                                         patterns.n,
@@ -921,7 +920,7 @@ SEXP RC_sassy_searcher_search(SEXP searcher_s,
                                          patterns.n,
                                          text_id_s,
                                          texts.n);
-    rsassy_matches_free(matches, n_matches);
+    Rsassy_native.matches_free(matches, n_matches);
     return out;
 }
 
@@ -948,7 +947,7 @@ SEXP RC_sassy_crispr(SEXP guide_s,
 
     RsassyMatch *matches = NULL;
     uintptr_t n_matches = 0;
-    if (rsassy_crispr_search_many(guides.data,
+    if (Rsassy_native.crispr_search_many(guides.data,
                                   guides.len,
                                   guides.n,
                                   texts.data,
@@ -971,7 +970,7 @@ SEXP RC_sassy_crispr(SEXP guide_s,
                                         pattern_id_s,
                                         &texts,
                                         text_id_s);
-    rsassy_matches_free(matches, n_matches);
+    Rsassy_native.matches_free(matches, n_matches);
     return out;
 }
 
@@ -1123,7 +1122,7 @@ SEXP RC_sassy_features(void) {
     Rsassy_init_backend();
 
     const char *installed_backends = Rsassy_available_backend_names();
-    const char *rust_features = rsassy_features_string();
+    const char *rust_features = Rsassy_native.features_string();
     R_xlen_t n = (R_xlen_t)(7 + Rsassy_feature_line_count(rust_features));
     SEXP out = PROTECT(Rf_allocVector(VECSXP, n));
     SEXP names = PROTECT(Rf_allocVector(STRSXP, n));
