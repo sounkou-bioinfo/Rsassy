@@ -3,6 +3,8 @@
 .RData
 .venv/
 README.html
+benchmarks/fastx/*.html
+benchmarks/fastx/*_files/
 src/.cargo
 src/Makevars
 src/Makevars.win

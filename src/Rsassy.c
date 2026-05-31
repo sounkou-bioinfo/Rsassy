@@ -1,11 +1,13 @@
 #define _GNU_SOURCE
 
 #include <R.h>
-#include <R_ext/Rdynload.h>
 #include <Rinternals.h>
+#include <R_ext/Rdynload.h>
+#include <R_ext/Altrep.h>
 
 #include "rsassy_native.h"
 
+#include <limits.h>
 #include <math.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -101,6 +103,371 @@ static double Rsassy_fraction_scalar(SEXP x, const char *arg) {
         Rf_error("%s must be a numeric scalar in [0, 1]", arg);
     }
     return value;
+}
+
+/* ---- FASTX chunked ALTREP batches --------------------------------------
+ *
+ * Rust/needletail owns iterator parsing and immutable batch slabs.  C owns the
+ * R lifetime/ALTREP surface.  Raw sequence/quality ALTREPs expose read-only
+ * pointers directly into the batch slab; writable access materializes a private
+ * R raw vector copy and leaves the shared slab unchanged.
+ */
+
+enum {
+    RSASSY_FASTX_BUFFER_SEQ = 0,
+    RSASSY_FASTX_BUFFER_QUAL = 1,
+    RSASSY_FASTX_RAW_STATE_META = 0,
+    RSASSY_FASTX_RAW_STATE_MATERIALIZED = 1,
+    RSASSY_FASTX_RAW_STATE_LEN = 2,
+};
+
+static R_altrep_class_t Rsassy_fastx_id_class;
+static R_altrep_class_t Rsassy_fastx_raw_class;
+static R_altrep_class_t Rsassy_fastx_list_class;
+
+static SEXP Rsassy_fastx_iter_tag(void) {
+    return Rf_install("Rsassy_fastx_iter_ptr");
+}
+
+static SEXP Rsassy_fastx_batch_tag(void) {
+    return Rf_install("Rsassy_fastx_batch_ptr");
+}
+
+static void Rsassy_fastx_iter_finalizer(SEXP xp) {
+    RsassyFastxIter *iter = (RsassyFastxIter *)R_ExternalPtrAddr(xp);
+    if (iter != NULL) {
+        rsassy_fastx_iter_free(iter);
+        R_ClearExternalPtr(xp);
+    }
+}
+
+static void Rsassy_fastx_batch_finalizer(SEXP xp) {
+    RsassyFastxBatch *batch = (RsassyFastxBatch *)R_ExternalPtrAddr(xp);
+    if (batch != NULL) {
+        rsassy_fastx_batch_free(batch);
+        R_ClearExternalPtr(xp);
+    }
+}
+
+static RsassyFastxIter *Rsassy_fastx_iter_from_xptr(SEXP xp) {
+    if (TYPEOF(xp) != EXTPTRSXP || R_ExternalPtrTag(xp) != Rsassy_fastx_iter_tag()) {
+        Rf_error("iter must be an external pointer created by sassy_fastx_iter()");
+    }
+    RsassyFastxIter *iter = (RsassyFastxIter *)R_ExternalPtrAddr(xp);
+    if (iter == NULL) {
+        Rf_error("FASTX iterator pointer is no longer valid");
+    }
+    return iter;
+}
+
+static RsassyFastxBatch *Rsassy_fastx_batch_from_xptr(SEXP xp) {
+    if (TYPEOF(xp) != EXTPTRSXP || R_ExternalPtrTag(xp) != Rsassy_fastx_batch_tag()) {
+        Rf_error("FASTX batch owner is invalid");
+    }
+    RsassyFastxBatch *batch = (RsassyFastxBatch *)R_ExternalPtrAddr(xp);
+    if (batch == NULL) {
+        Rf_error("FASTX batch pointer is no longer valid");
+    }
+    return batch;
+}
+
+static R_xlen_t Rsassy_fastx_r_length(uintptr_t len, const char *what) {
+    if ((uint64_t)len > (uint64_t)R_XLEN_T_MAX) {
+        Rf_error("%s is too large for an R vector", what);
+    }
+    return (R_xlen_t)len;
+}
+
+static uintptr_t Rsassy_fastx_batch_n_checked(RsassyFastxBatch *batch) {
+    uintptr_t n = rsassy_fastx_batch_n(batch);
+    (void)Rsassy_fastx_r_length(n, "FASTX batch");
+    return n;
+}
+
+static int Rsassy_fastx_kind(SEXP kind_s) {
+    if (TYPEOF(kind_s) != INTSXP || XLENGTH(kind_s) != 1 || INTEGER(kind_s)[0] == NA_INTEGER) {
+        Rf_error("internal FASTX buffer kind is invalid");
+    }
+    int kind = INTEGER(kind_s)[0];
+    if (kind != RSASSY_FASTX_BUFFER_SEQ && kind != RSASSY_FASTX_BUFFER_QUAL) {
+        Rf_error("internal FASTX buffer kind is unknown");
+    }
+    return kind;
+}
+
+static SEXP Rsassy_fastx_make_raw_state(int kind, R_xlen_t index) {
+    SEXP state = PROTECT(Rf_allocVector(VECSXP, RSASSY_FASTX_RAW_STATE_LEN));
+    SEXP meta = PROTECT(Rf_allocVector(REALSXP, 2));
+    REAL(meta)[0] = (double)kind;
+    REAL(meta)[1] = (double)index;
+    SET_VECTOR_ELT(state, RSASSY_FASTX_RAW_STATE_META, meta);
+    SET_VECTOR_ELT(state, RSASSY_FASTX_RAW_STATE_MATERIALIZED, R_NilValue);
+    UNPROTECT(2);
+    return state;
+}
+
+static SEXP Rsassy_fastx_raw_state(SEXP x) {
+    SEXP state = R_altrep_data2(x);
+    if (TYPEOF(state) != VECSXP || XLENGTH(state) != RSASSY_FASTX_RAW_STATE_LEN) {
+        Rf_error("internal FASTX raw ALTREP state is invalid");
+    }
+    return state;
+}
+
+static void Rsassy_fastx_raw_meta(SEXP x, int *kind, uintptr_t *index) {
+    SEXP state = Rsassy_fastx_raw_state(x);
+    SEXP meta = VECTOR_ELT(state, RSASSY_FASTX_RAW_STATE_META);
+    if (TYPEOF(meta) != REALSXP || XLENGTH(meta) != 2) {
+        Rf_error("internal FASTX raw ALTREP metadata is invalid");
+    }
+    double kind_d = REAL(meta)[0];
+    double index_d = REAL(meta)[1];
+    if (!R_FINITE(kind_d) || !R_FINITE(index_d) || kind_d < 0 || index_d < 0 || floor(kind_d) != kind_d || floor(index_d) != index_d) {
+        Rf_error("internal FASTX raw ALTREP metadata is invalid");
+    }
+    *kind = (int)kind_d;
+    if (*kind != RSASSY_FASTX_BUFFER_SEQ && *kind != RSASSY_FASTX_BUFFER_QUAL) {
+        Rf_error("internal FASTX raw ALTREP buffer kind is invalid");
+    }
+    *index = (uintptr_t)index_d;
+}
+
+static SEXP Rsassy_fastx_raw_materialized(SEXP x) {
+    SEXP state = Rsassy_fastx_raw_state(x);
+    SEXP materialized = VECTOR_ELT(state, RSASSY_FASTX_RAW_STATE_MATERIALIZED);
+    if (materialized != R_NilValue && TYPEOF(materialized) != RAWSXP) {
+        Rf_error("internal FASTX raw materialization is invalid");
+    }
+    return materialized;
+}
+
+static uintptr_t Rsassy_fastx_slice_len(RsassyFastxBatch *batch, int kind, uintptr_t index) {
+    return kind == RSASSY_FASTX_BUFFER_SEQ
+               ? rsassy_fastx_batch_seq_len(batch, index)
+               : rsassy_fastx_batch_qual_len(batch, index);
+}
+
+static const uint8_t *Rsassy_fastx_slice_ptr(RsassyFastxBatch *batch, int kind, uintptr_t index) {
+    return kind == RSASSY_FASTX_BUFFER_SEQ
+               ? rsassy_fastx_batch_seq_ptr(batch, index)
+               : rsassy_fastx_batch_qual_ptr(batch, index);
+}
+
+static R_xlen_t Rsassy_fastx_raw_Length(SEXP x) {
+    RsassyFastxBatch *batch = Rsassy_fastx_batch_from_xptr(R_altrep_data1(x));
+    int kind;
+    uintptr_t index;
+    Rsassy_fastx_raw_meta(x, &kind, &index);
+    return Rsassy_fastx_r_length(Rsassy_fastx_slice_len(batch, kind, index), "FASTX raw slice");
+}
+
+static Rbyte Rsassy_fastx_raw_Elt(SEXP x, R_xlen_t i) {
+    SEXP materialized = Rsassy_fastx_raw_materialized(x);
+    if (materialized != R_NilValue) {
+        return RAW(materialized)[i];
+    }
+    RsassyFastxBatch *batch = Rsassy_fastx_batch_from_xptr(R_altrep_data1(x));
+    int kind;
+    uintptr_t index;
+    Rsassy_fastx_raw_meta(x, &kind, &index);
+    uintptr_t len = Rsassy_fastx_slice_len(batch, kind, index);
+    if (i < 0 || (uint64_t)i >= (uint64_t)len) {
+        Rf_error("FASTX raw slice index out of bounds");
+    }
+    const uint8_t *ptr = Rsassy_fastx_slice_ptr(batch, kind, index);
+    if (ptr == NULL && len > 0) {
+        Rf_error("FASTX raw slice pointer is unavailable");
+    }
+    return (Rbyte)ptr[i];
+}
+
+static R_xlen_t Rsassy_fastx_raw_Get_region(SEXP x, R_xlen_t i, R_xlen_t n, Rbyte *buf) {
+    if (n <= 0) {
+        return 0;
+    }
+    R_xlen_t len = Rsassy_fastx_raw_Length(x);
+    if (i < 0 || i >= len) {
+        return 0;
+    }
+    R_xlen_t out_n = n < (len - i) ? n : (len - i);
+    SEXP materialized = Rsassy_fastx_raw_materialized(x);
+    if (materialized != R_NilValue) {
+        memcpy(buf, RAW(materialized) + i, (size_t)out_n);
+        return out_n;
+    }
+    RsassyFastxBatch *batch = Rsassy_fastx_batch_from_xptr(R_altrep_data1(x));
+    int kind;
+    uintptr_t index;
+    Rsassy_fastx_raw_meta(x, &kind, &index);
+    const uint8_t *ptr = Rsassy_fastx_slice_ptr(batch, kind, index);
+    if (ptr == NULL && len > 0) {
+        Rf_error("FASTX raw slice pointer is unavailable");
+    }
+    memcpy(buf, ptr + i, (size_t)out_n);
+    return out_n;
+}
+
+static const void *Rsassy_fastx_raw_Dataptr_or_null(SEXP x) {
+    SEXP materialized = Rsassy_fastx_raw_materialized(x);
+    if (materialized != R_NilValue) {
+        return RAW(materialized);
+    }
+    RsassyFastxBatch *batch = Rsassy_fastx_batch_from_xptr(R_altrep_data1(x));
+    int kind;
+    uintptr_t index;
+    Rsassy_fastx_raw_meta(x, &kind, &index);
+    uintptr_t len = Rsassy_fastx_slice_len(batch, kind, index);
+    if (len == 0) {
+        return NULL;
+    }
+    return Rsassy_fastx_slice_ptr(batch, kind, index);
+}
+
+static void *Rsassy_fastx_raw_Dataptr(SEXP x, Rboolean writeable) {
+    SEXP materialized = Rsassy_fastx_raw_materialized(x);
+    if (materialized != R_NilValue) {
+        return RAW(materialized);
+    }
+    R_xlen_t len = Rsassy_fastx_raw_Length(x);
+    const void *ptr = Rsassy_fastx_raw_Dataptr_or_null(x);
+    if (!writeable) {
+        return (void *)ptr;
+    }
+
+    SEXP state = Rsassy_fastx_raw_state(x);
+    SEXP copy = PROTECT(Rf_allocVector(RAWSXP, len));
+    if (len > 0) {
+        if (ptr == NULL) {
+            Rf_error("FASTX raw slice pointer is unavailable");
+        }
+        memcpy(RAW(copy), ptr, (size_t)len);
+    }
+    SET_VECTOR_ELT(state, RSASSY_FASTX_RAW_STATE_MATERIALIZED, copy);
+    UNPROTECT(1);
+    return RAW(copy);
+}
+
+static R_xlen_t Rsassy_fastx_id_Length(SEXP x) {
+    RsassyFastxBatch *batch = Rsassy_fastx_batch_from_xptr(R_altrep_data1(x));
+    return Rsassy_fastx_r_length(Rsassy_fastx_batch_n_checked(batch), "FASTX id vector");
+}
+
+static SEXP Rsassy_fastx_id_Elt(SEXP x, R_xlen_t i) {
+    RsassyFastxBatch *batch = Rsassy_fastx_batch_from_xptr(R_altrep_data1(x));
+    uintptr_t n = Rsassy_fastx_batch_n_checked(batch);
+    if (i < 0 || (uint64_t)i >= (uint64_t)n) {
+        Rf_error("FASTX id index out of bounds");
+    }
+    uintptr_t len = rsassy_fastx_batch_id_len(batch, (uintptr_t)i);
+    if (len > (uintptr_t)INT_MAX) {
+        Rf_error("FASTX id is too long for an R character string");
+    }
+    if (len == 0) {
+        return R_BlankString;
+    }
+    const uint8_t *ptr = rsassy_fastx_batch_id_ptr(batch, (uintptr_t)i);
+    if (ptr == NULL && len > 0) {
+        Rf_error("FASTX id pointer is unavailable");
+    }
+    cetype_t encoding = rsassy_fastx_batch_id_utf8(batch, (uintptr_t)i) ? CE_UTF8 : CE_BYTES;
+    return Rf_mkCharLenCE((const char *)ptr, (int)len, encoding);
+}
+
+static int Rsassy_fastx_id_No_NA(SEXP x) {
+    (void)x;
+    return 1;
+}
+
+static R_xlen_t Rsassy_fastx_list_Length(SEXP x) {
+    RsassyFastxBatch *batch = Rsassy_fastx_batch_from_xptr(R_altrep_data1(x));
+    return Rsassy_fastx_r_length(Rsassy_fastx_batch_n_checked(batch), "FASTX sequence list");
+}
+
+static SEXP Rsassy_fastx_make_raw_slice(SEXP batch_xp, int kind, R_xlen_t index) {
+    SEXP state = PROTECT(Rsassy_fastx_make_raw_state(kind, index));
+    SEXP out = R_new_altrep(Rsassy_fastx_raw_class, batch_xp, state);
+    UNPROTECT(1);
+    return out;
+}
+
+static SEXP Rsassy_fastx_list_Elt(SEXP x, R_xlen_t i) {
+    RsassyFastxBatch *batch = Rsassy_fastx_batch_from_xptr(R_altrep_data1(x));
+    uintptr_t n = Rsassy_fastx_batch_n_checked(batch);
+    if (i < 0 || (uint64_t)i >= (uint64_t)n) {
+        Rf_error("FASTX list index out of bounds");
+    }
+    int kind = Rsassy_fastx_kind(R_altrep_data2(x));
+    return Rsassy_fastx_make_raw_slice(R_altrep_data1(x), kind, i);
+}
+
+static void Rsassy_fastx_list_Set_elt(SEXP x, R_xlen_t i, SEXP v) {
+    (void)x;
+    (void)i;
+    (void)v;
+    Rf_error("FASTX ALTREP sequence lists are read-only");
+}
+
+static SEXP Rsassy_fastx_make_list_view(SEXP batch_xp, int kind) {
+    SEXP kind_s = PROTECT(Rf_ScalarInteger(kind));
+    SEXP out = R_new_altrep(Rsassy_fastx_list_class, batch_xp, kind_s);
+    UNPROTECT(1);
+    return out;
+}
+
+static SEXP Rsassy_fastx_make_batch(RsassyFastxBatch *batch) {
+    SEXP batch_xp = PROTECT(R_MakeExternalPtr(batch, Rsassy_fastx_batch_tag(), R_NilValue));
+    R_RegisterCFinalizerEx(batch_xp, Rsassy_fastx_batch_finalizer, TRUE);
+
+    SEXP id = PROTECT(R_new_altrep(Rsassy_fastx_id_class, batch_xp, R_NilValue));
+    SEXP seq = PROTECT(Rsassy_fastx_make_list_view(batch_xp, RSASSY_FASTX_BUFFER_SEQ));
+    SEXP qual = PROTECT(rsassy_fastx_batch_has_qual(batch) ? Rsassy_fastx_make_list_view(batch_xp, RSASSY_FASTX_BUFFER_QUAL) : R_NilValue);
+
+    SEXP out = PROTECT(Rf_allocVector(VECSXP, 3));
+    SEXP names = PROTECT(Rf_allocVector(STRSXP, 3));
+    SET_STRING_ELT(names, 0, Rf_mkChar("id"));
+    SET_STRING_ELT(names, 1, Rf_mkChar("seq"));
+    SET_STRING_ELT(names, 2, Rf_mkChar("qual"));
+    SET_VECTOR_ELT(out, 0, id);
+    SET_VECTOR_ELT(out, 1, seq);
+    SET_VECTOR_ELT(out, 2, qual);
+    Rf_setAttrib(out, R_NamesSymbol, names);
+
+    SEXP klass = PROTECT(Rf_mkString("sassy_fastx_batch"));
+    Rf_setAttrib(out, R_ClassSymbol, klass);
+
+    UNPROTECT(7);
+    return out;
+}
+
+SEXP RC_sassy_fastx_iter_new(SEXP path_s, SEXP batch_records_s, SEXP include_qual_s) {
+    Rsassy_init_backend();
+    const char *path = Rsassy_string_scalar(path_s, "path");
+    uintptr_t batch_records = Rsassy_uintptr_scalar(batch_records_s, "batch_records", 1);
+    int include_qual = Rsassy_logical_scalar(include_qual_s, "include_qual");
+
+    RsassyFastxIter *iter = NULL;
+    if (rsassy_fastx_iter_new(path, batch_records, include_qual == TRUE, &iter) != 0) {
+        Rsassy_stop_last_error();
+    }
+
+    SEXP xp = PROTECT(R_MakeExternalPtr(iter, Rsassy_fastx_iter_tag(), R_NilValue));
+    R_RegisterCFinalizerEx(xp, Rsassy_fastx_iter_finalizer, TRUE);
+    SEXP klass = PROTECT(Rf_mkString("sassy_fastx_iter"));
+    Rf_setAttrib(xp, R_ClassSymbol, klass);
+    UNPROTECT(2);
+    return xp;
+}
+
+SEXP RC_sassy_fastx_next(SEXP iter_s) {
+    RsassyFastxIter *iter = Rsassy_fastx_iter_from_xptr(iter_s);
+    RsassyFastxBatch *batch = NULL;
+    if (rsassy_fastx_iter_next(iter, &batch) != 0) {
+        Rsassy_stop_last_error();
+    }
+    if (batch == NULL) {
+        return R_NilValue;
+    }
+    return Rsassy_fastx_make_batch(batch);
 }
 
 SEXP RC_sassy_searcher_new(SEXP alphabet_s, SEXP rc_s, SEXP alpha_s) {
@@ -779,6 +1146,8 @@ SEXP RC_sassy_features(void) {
 static const R_CallMethodDef CallEntries[] = {
     {"RC_sassy_features", (DL_FUNC)&RC_sassy_features, 0},
     {"RC_sassy_set_backend", (DL_FUNC)&RC_sassy_set_backend, 1},
+    {"RC_sassy_fastx_iter_new", (DL_FUNC)&RC_sassy_fastx_iter_new, 3},
+    {"RC_sassy_fastx_next", (DL_FUNC)&RC_sassy_fastx_next, 1},
     {"RC_sassy_searcher_new", (DL_FUNC)&RC_sassy_searcher_new, 3},
     {"RC_sassy_searcher_search", (DL_FUNC)&RC_sassy_searcher_search, 10},
     {"RC_sassy_crispr", (DL_FUNC)&RC_sassy_crispr, 10},
@@ -788,4 +1157,21 @@ static const R_CallMethodDef CallEntries[] = {
 void R_init_Rsassy(DllInfo *dll) {
     R_registerRoutines(dll, NULL, CallEntries, NULL, NULL);
     R_useDynamicSymbols(dll, FALSE);
+
+    Rsassy_fastx_id_class = R_make_altstring_class("sassy_fastx_id", "Rsassy", dll);
+    R_set_altrep_Length_method(Rsassy_fastx_id_class, Rsassy_fastx_id_Length);
+    R_set_altstring_Elt_method(Rsassy_fastx_id_class, Rsassy_fastx_id_Elt);
+    R_set_altstring_No_NA_method(Rsassy_fastx_id_class, Rsassy_fastx_id_No_NA);
+
+    Rsassy_fastx_raw_class = R_make_altraw_class("sassy_fastx_raw", "Rsassy", dll);
+    R_set_altrep_Length_method(Rsassy_fastx_raw_class, Rsassy_fastx_raw_Length);
+    R_set_altraw_Elt_method(Rsassy_fastx_raw_class, Rsassy_fastx_raw_Elt);
+    R_set_altraw_Get_region_method(Rsassy_fastx_raw_class, Rsassy_fastx_raw_Get_region);
+    R_set_altvec_Dataptr_or_null_method(Rsassy_fastx_raw_class, Rsassy_fastx_raw_Dataptr_or_null);
+    R_set_altvec_Dataptr_method(Rsassy_fastx_raw_class, Rsassy_fastx_raw_Dataptr);
+
+    Rsassy_fastx_list_class = R_make_altlist_class("sassy_fastx_list", "Rsassy", dll);
+    R_set_altrep_Length_method(Rsassy_fastx_list_class, Rsassy_fastx_list_Length);
+    R_set_altlist_Elt_method(Rsassy_fastx_list_class, Rsassy_fastx_list_Elt);
+    R_set_altlist_Set_elt_method(Rsassy_fastx_list_class, Rsassy_fastx_list_Set_elt);
 }

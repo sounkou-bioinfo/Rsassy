@@ -91,6 +91,55 @@ sassy_set_backend <- function(backend = c("auto", "scalar", "avx2", "avx512", "n
   invisible(.Call("RC_sassy_set_backend", backend, PACKAGE = "Rsassy"))
 }
 
+#' Create a chunked FASTA/FASTQ iterator
+#'
+#' `sassy_fastx_iter()` opens a FASTA or FASTQ file and returns an iterator that
+#' yields record-count-bounded batches. Parsing is performed by the vendored
+#' Rust `needletail` parser. Sequence and quality data in each batch are exposed
+#' as read-only raw ALTREP slices over immutable native batch buffers; they are
+#' not eagerly materialized as R strings.
+#'
+#' @param path Path to a FASTA/FASTQ file. Gzip-compressed input is supported by
+#'   the vendored `needletail` gzip backend.
+#' @param batch_records Maximum number of records returned by each
+#'   `sassy_fastx_next()` call.
+#' @param include_qual If `TRUE`, FASTQ qualities are included as `batch$qual`.
+#'   If `FALSE`, or for FASTA input, `batch$qual` is `NULL`.
+#' @return An external pointer with class `sassy_fastx_iter`.
+#' @examples
+#' fq <- tempfile(fileext = ".fastq")
+#' writeLines(c("@r1", "ACGT", "+", "!!!!"), fq, useBytes = TRUE)
+#' it <- sassy_fastx_iter(fq, batch_records = 1)
+#' batch <- sassy_fastx_next(it)
+#' rawToChar(batch$seq[[1]])
+#' @export
+sassy_fastx_iter <- function(path, batch_records = 100000L, include_qual = TRUE) {
+  if (!is.character(path) || length(path) != 1L || is.na(path)) {
+    stop("path must be a non-missing character scalar", call. = FALSE)
+  }
+  path <- enc2utf8(path)
+  batch_records <- sassy_positive_count_scalar(batch_records, "batch_records")
+  include_qual <- sassy_logical_scalar(include_qual, "include_qual")
+  .Call("RC_sassy_fastx_iter_new", path, batch_records, include_qual, PACKAGE = "Rsassy")
+}
+
+#' Get the next FASTA/FASTQ batch
+#'
+#' @param iter An iterator created by `sassy_fastx_iter()`.
+#' @return `NULL` at end of file, otherwise a `sassy_fastx_batch` list with
+#'   `id`, `seq`, and `qual` elements. `id` is an ALTREP character vector, while
+#'   `seq` and `qual` are ALTREP lists whose elements are raw ALTREP vectors.
+#' @examples
+#' fq <- tempfile(fileext = ".fastq")
+#' writeLines(c("@r1", "ACGT", "+", "!!!!"), fq, useBytes = TRUE)
+#' it <- sassy_fastx_iter(fq, batch_records = 1)
+#' batch <- sassy_fastx_next(it)
+#' length(batch$id)
+#' @export
+sassy_fastx_next <- function(iter) {
+  .Call("RC_sassy_fastx_next", iter, PACKAGE = "Rsassy")
+}
+
 #' Create a reusable 'sassy' searcher
 #'
 #' A searcher stores the selected alphabet profile and reverse-complement
@@ -351,6 +400,13 @@ sassy_logical_scalar <- function(x, arg) {
     stop(sprintf("%s must be TRUE or FALSE", arg), call. = FALSE)
   }
   isTRUE(x)
+}
+
+sassy_positive_count_scalar <- function(x, arg) {
+  if (!is.numeric(x) || length(x) != 1L || is.na(x) || !is.finite(x) || x < 1 || x != floor(x)) {
+    stop(sprintf("%s must be a positive integer-like scalar", arg), call. = FALSE)
+  }
+  x
 }
 
 sassy_alphabet_scalar <- function(x) {

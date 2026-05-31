@@ -7,7 +7,11 @@ thread_local! {
 }
 
 fn bool_text(value: bool) -> &'static str {
-    if value { "true" } else { "false" }
+    if value {
+        "true"
+    } else {
+        "false"
+    }
 }
 
 fn build_features_string() -> String {
@@ -59,6 +63,8 @@ fn build_features_string() -> String {
         "selected_compiled_wasm_simd128: {}\n",
         bool_text(compiled_wasm_simd128)
     ));
+    out.push_str("fastx_parser: needletail\n");
+    out.push_str("fastx_compression_gzip: true\n");
     out
 }
 

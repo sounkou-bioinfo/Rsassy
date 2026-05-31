@@ -21,6 +21,7 @@ native-simd = []
 # dependency with tools/vendor-rust.R; do not require a sibling sassy checkout.
 sassy = { version = "0.2.1", default-features = false }
 rayon = "1.12.0"
+needletail = { version = "0.6.3", default-features = false, features = ["flate2"] }
 
 [profile.release]
 lto = true

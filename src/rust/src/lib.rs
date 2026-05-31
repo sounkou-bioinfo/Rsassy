@@ -1,4 +1,5 @@
 mod backend;
+mod fastx;
 mod search_many;
 
 #[cfg(not(target_arch = "wasm32"))]

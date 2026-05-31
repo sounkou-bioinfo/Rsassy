@@ -1,0 +1,182 @@
+---
+title: "R Binding Conformance Checks"
+output: github_document
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+library(Rsassy)
+```
+
+Executable conformance checks for the R binding surface. This report compares
+Rsassy outputs to the upstream `sassy` CLI where there is a matching CLI surface,
+and checks R-only invariants such as list/raw inputs and threaded equivalence.
+Run with:
+
+```sh
+make r-bindings-conformance
+```
+
+```{r helpers}
+cli <- Sys.getenv("SASSY_CLI", unset = Sys.which("sassy"))
+if (!nzchar(cli)) cli <- "/tmp/sassy-cli-root/bin/sassy"
+system2(cli, "--version", stdout = TRUE)
+
+run_cli <- function(args) {
+  lines <- system2(cli, args, stdout = TRUE, stderr = TRUE)
+  status <- attr(lines, "status")
+  stopifnot(is.null(status) || identical(status, 0L))
+  lines
+}
+
+cli_table <- function(args) {
+  lines <- run_cli(args)
+  lines <- lines[grepl("\t", lines)]
+  utils::read.delim(text = paste(lines, collapse = "\n"), stringsAsFactors = FALSE, check.names = FALSE)
+}
+
+write_fasta <- function(records, file) {
+  con <- file(file, open = "wb")
+  on.exit(close(con), add = TRUE)
+  for (id in names(records)) writeLines(c(paste0(">", id), records[[id]]), con, useBytes = TRUE)
+  file
+}
+
+search_to_cli <- function(x, pattern_ids, text_ids) {
+  data.frame(
+    pat_id = pattern_ids[x$pattern_idx + 1L],
+    text_id = text_ids[x$text_idx + 1L],
+    cost = as.integer(x$cost),
+    strand = as.character(x$strand),
+    start = as.integer(x$text_start),
+    end = as.integer(x$text_end),
+    match_region = as.character(x$match_region),
+    cigar = as.character(x$cigar),
+    stringsAsFactors = FALSE
+  )
+}
+
+norm_search <- function(x) {
+  cols <- c("pat_id", "text_id", "cost", "strand", "start", "end", "match_region", "cigar")
+  x <- as.data.frame(x)[cols]
+  x$cost <- as.integer(x$cost)
+  x$start <- as.integer(x$start)
+  x$end <- as.integer(x$end)
+  for (col in setdiff(cols, c("cost", "start", "end"))) x[[col]] <- as.character(x[[col]])
+  x <- x[do.call(order, x), , drop = FALSE]
+  row.names(x) <- NULL
+  x
+}
+
+norm_crispr <- function(x) {
+  cols <- c("guide", "text_id", "cost", "strand", "start", "end", "match_region", "cigar")
+  x <- as.data.frame(x)[cols]
+  x$cost <- as.integer(x$cost)
+  x$start <- as.integer(x$start)
+  x$end <- as.integer(x$end)
+  for (col in setdiff(cols, c("cost", "start", "end"))) x[[col]] <- as.character(x[[col]])
+  x <- x[do.call(order, x), , drop = FALSE]
+  row.names(x) <- NULL
+  x
+}
+
+tmp <- tempfile("rsassy-bindings-conf-")
+dir.create(tmp)
+```
+
+## Search, encoded patterns, and SAM orientation vs CLI
+
+```{r search-cli}
+patterns <- c(p_atg = "ATG", p_ttt = "TTT")
+texts <- c(t1 = "CCCCATGCCCCTTT")
+pattern_fa <- write_fasta(patterns, file.path(tmp, "patterns.fa"))
+text_fa <- write_fasta(texts, file.path(tmp, "texts.fa"))
+
+cli_pairwise <- norm_search(cli_table(c("search", "--pattern-fasta", pattern_fa, "-k", "1", "--no-rc", "--alphabet", "iupac", text_fa)))
+r_pairwise <- norm_search(search_to_cli(
+  sassy_search(as.list(unname(patterns)), as.list(unname(texts)), 1, alphabet = "iupac", rc = FALSE, strategy = "pairwise", match_region = TRUE),
+  names(patterns), names(texts)
+))
+cli_pairwise
+r_pairwise
+stopifnot(identical(r_pairwise, cli_pairwise))
+
+cli_v2 <- norm_search(cli_table(c("search", "--pattern-fasta", pattern_fa, "-k", "1", "--no-rc", "--alphabet", "iupac", "--v2", text_fa)))
+r_v2 <- norm_search(search_to_cli(
+  sassy_search(as.list(unname(patterns)), as.list(unname(texts)), 1, alphabet = "iupac", rc = FALSE, strategy = "encoded_patterns", match_region = TRUE),
+  names(patterns), names(texts)
+))
+stopifnot(identical(r_v2, cli_v2))
+
+sam_texts <- c(chr1 = "TTTCGTTT")
+sam_fa <- write_fasta(sam_texts, file.path(tmp, "sam.fa"))
+cli_sam <- norm_search(cli_table(c("search", "-p", "ACGA", "-k", "0", "--alphabet", "dna", "--sam", sam_fa)))
+r_sam <- norm_search(search_to_cli(
+  sassy_search(list("ACGA"), as.list(unname(sam_texts)), 0, alphabet = "dna", match_region = TRUE, sam = TRUE),
+  "pattern", names(sam_texts)
+))
+stopifnot(identical(r_sam, cli_sam))
+```
+
+## Threading and strategy equivalence
+
+```{r threading}
+texts_many <- rep("CCCC", 130L)
+texts_many[c(2L, 65L, 130L)] <- c("ATGCCC", "CCATGCC", "GGGATG")
+serial <- sassy_search(list("ATG"), as.list(texts_many), 0, alphabet = "dna", rc = FALSE, strategy = "pairwise", threads = 1L)
+parallel <- sassy_search(list("ATG"), as.list(texts_many), 0, alphabet = "dna", rc = FALSE, strategy = "pairwise", threads = 4L)
+stopifnot(identical(parallel, serial))
+
+batch_texts <- sassy_search(list("ATG"), list("CCCCATG", "TTTATG"), 0, alphabet = "iupac", rc = FALSE, strategy = "batch_texts")
+pairwise_texts <- sassy_search(list("ATG"), list("CCCCATG", "TTTATG"), 0, alphabet = "iupac", rc = FALSE, strategy = "pairwise")
+stopifnot(identical(batch_texts, pairwise_texts))
+
+batch_patterns <- sassy_search(list("ATG", "TTT"), list("CCCCATGCCCCTTT"), 0, alphabet = "iupac", rc = FALSE, strategy = "batch_patterns")
+pairwise_patterns <- sassy_search(list("ATG", "TTT"), list("CCCCATGCCCCTTT"), 0, alphabet = "iupac", rc = FALSE, strategy = "pairwise")
+stopifnot(identical(batch_patterns, pairwise_patterns))
+```
+
+## Raw/list input and ID mapping invariants
+
+```{r input-invariants}
+raw_hits <- sassy_search(list(charToRaw("ACGT")), list(charToRaw("TTACGTAA")), 0, alphabet = "dna", rc = FALSE)
+char_hits <- sassy_search(list("ACGT"), list("TTACGTAA"), 0, alphabet = "dna", rc = FALSE)
+stopifnot(identical(raw_hits, char_hits))
+
+id_hits <- sassy_search(
+  list("ATG", "TTT"),
+  list("CCCCATG", "TTTATG"),
+  0,
+  alphabet = "iupac",
+  rc = FALSE,
+  pattern_id = c("guide_a", "guide_b"),
+  text_id = c("record_a", "record_b")
+)
+stopifnot(identical(id_hits$pattern_id, c("guide_a", "guide_b", "guide_a")))
+stopifnot(identical(id_hits$text_id, c("record_a", "record_b", "record_b")))
+stopifnot(inherits(try(sassy_search("ATG", list("CCCCATG"), 0), silent = TRUE), "try-error"))
+stopifnot(inherits(try(sassy_search(charToRaw("ATG"), list("CCCCATG"), 0), silent = TRUE), "try-error"))
+```
+
+## CRISPR vs CLI and threaded equivalence
+
+```{r crispr-cli}
+guides <- "ACGTNGG"
+crispr_texts <- c(chr1 = "TTTACGTAGGTTT", chr2 = "TTTACGTAAATTT")
+guide_file <- file.path(tmp, "guides.txt")
+writeLines(guides, guide_file, useBytes = TRUE)
+crispr_fa <- write_fasta(crispr_texts, file.path(tmp, "crispr.fa"))
+crispr_out <- file.path(tmp, "crispr.tsv")
+invisible(run_cli(c("crispr", "--guide", guide_file, "-k", "2", "--max-n-frac", "0.2", "--no-rc", "--threads", "1", "--output", crispr_out, crispr_fa)))
+cli_crispr <- norm_crispr(utils::read.delim(crispr_out, stringsAsFactors = FALSE, check.names = FALSE))
+r_crispr <- norm_crispr(sassy_crispr(as.list(guides), as.list(unname(crispr_texts)), 2, max_n_frac = 0.2, rc = FALSE, threads = 1L, text_id = names(crispr_texts)))
+cli_crispr
+r_crispr
+stopifnot(identical(r_crispr, cli_crispr))
+
+crispr_serial <- sassy_crispr(list("ACGTNGG", "TTTTNGG"), list("TTTACGTAGGTTT", "AAATTTTAGGAAA"), 0, rc = FALSE, threads = 1L)
+crispr_parallel <- sassy_crispr(list("ACGTNGG", "TTTTNGG"), list("TTTACGTAGGTTT", "AAATTTTAGGAAA"), 0, rc = FALSE, threads = 4L)
+stopifnot(identical(crispr_parallel, crispr_serial))
+```
+
+All R binding conformance checks passed.

@@ -78,8 +78,8 @@ sassy_searcher_search(searcher, list("ATCGATCG"), list("GGGGATCGATCGTTTT"), k = 
 ```
 
 List inputs search every pattern against every text. Each element can be a raw
-vector or a character scalar, which also leaves room for ALTREP-backed string
-vectors to hand over batches as lists. For larger batches, use `threads > 1`.
+vector or a character scalar, which also leaves room for ALTREP-backed batches
+as lists. For larger batches, use `threads > 1`.
 
 ```{r}
 sassy_search(
@@ -114,6 +114,19 @@ sassy_search(
 )
 ```
 
+Chunked FASTA/FASTQ iteration is available with `sassy_fastx_iter()` and
+`sassy_fastx_next()`. Batches expose record IDs as an ALTREP character vector and
+sequences as a list of raw ALTREP slices over immutable native buffers, so search
+can consume file records without first materializing sequence strings in R.
+
+```{r}
+fq <- tempfile(fileext = ".fastq")
+writeLines(c("@r1", "ACGT", "+", "!!!!"), fq, useBytes = TRUE)
+it <- sassy_fastx_iter(fq, batch_records = 1)
+batch <- sassy_fastx_next(it)
+sassy_search(list("ACG"), batch$seq, k = 0, alphabet = "dna", rc = FALSE, text_id = batch$id)
+```
+
 CRISPR guide search is available for in-memory sequences with `sassy_crispr()`.
 Guides include the PAM suffix; by default the PAM must match exactly under IUPAC
 matching.
@@ -125,10 +138,6 @@ sassy_crispr(list("ACGTNGG"), list("TTTACGTAGGTTT"), k = 0, rc = FALSE)
 For file-oriented colored `grep`, FASTA/FASTQ filtering, and large command-line
 pipelines, use the upstream [Sassy](https://github.com/RagnarGrootKoerkamp/sassy)
 CLI directly.
-
-FASTA/FASTQ file search should use a future record-oriented API rather than a
-raw connection stream, so coordinates and record identifiers can follow the
-upstream Sassy CLI semantics.
 
 Inspect the installed build:
 
@@ -152,6 +161,7 @@ make readme       # regenerate README.md from README.Rmd
 make install      # install the package locally
 make test         # run tinytest tests
 make check        # build and run R CMD check
+make reports      # render committed conformance/performance markdown reports
 make clean        # remove generated build artifacts
 ```
 

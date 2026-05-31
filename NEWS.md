@@ -1,5 +1,11 @@
 # Rsassy 0.2.1-0.1.0.9000
 
+* Added experimental `sassy_fastx_iter()` / `sassy_fastx_next()` chunked
+  FASTA/FASTQ iteration backed by vendored `needletail`, with ALTREP character
+  record IDs and raw ALTREP sequence/quality slices over immutable native batch
+  buffers.
+* Added committed R Markdown/Markdown conformance and performance reports under
+  `benchmarks/`, with upstream `sassy` CLI baselines and threaded Rsassy runs.
 * Added a webR/WebAssembly package check in CI.
 * Built webR packages with static Rust FFI symbols and `wasm_simd128`.
 * Added native package-level SIMD backends:

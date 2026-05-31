@@ -17,12 +17,52 @@ Rsassy package code:
 Vendored Rust crate components:
 
 ------------------------------
+Name:       adler2
+Version:    2.0.1
+Files:      vendor/adler2-2.0.1/* inside src/rust/vendor.tar.xz
+Authors:    Jonas Schievink, oyvindln
+License:    0BSD OR MIT OR Apache-2.0
+Repository: https://github.com/oyvindln/adler2
+
+------------------------------
+Name:       buffer-redux
+Version:    1.1.0
+Files:      vendor/buffer-redux-1.1.0/* inside src/rust/vendor.tar.xz
+Authors:    dignifiedquire, Austin Bonander
+License:    MIT OR Apache-2.0
+Repository: https://github.com/dignifiedquire/buffer-redux
+
+------------------------------
+Name:       bytecount
+Version:    0.6.9
+Files:      vendor/bytecount-0.6.9/* inside src/rust/vendor.tar.xz
+Authors:    Andre Bogus, Joshua Landau
+License:    Apache-2.0/MIT
+Repository: https://github.com/llogiq/bytecount
+
+------------------------------
 Name:       bytemuck
 Version:    1.25.0
 Files:      vendor/bytemuck-1.25.0/* inside src/rust/vendor.tar.xz
 Authors:    Lokathor
 License:    Zlib OR Apache-2.0 OR MIT
 Repository: https://github.com/Lokathor/bytemuck
+
+------------------------------
+Name:       cfg-if
+Version:    1.0.4
+Files:      vendor/cfg-if-1.0.4/* inside src/rust/vendor.tar.xz
+Authors:    Alex Crichton
+License:    MIT OR Apache-2.0
+Repository: https://github.com/rust-lang/cfg-if
+
+------------------------------
+Name:       crc32fast
+Version:    1.5.0
+Files:      vendor/crc32fast-1.5.0/* inside src/rust/vendor.tar.xz
+Authors:    Sam Rijs, Alex Crichton
+License:    MIT OR Apache-2.0
+Repository: https://github.com/srijs/rust-crc32fast
 
 ------------------------------
 Name:       crossbeam-deque
@@ -89,6 +129,14 @@ License:    MIT
 Repository: https://github.com/RagnarGrootKoerkamp/ensure_simd
 
 ------------------------------
+Name:       flate2
+Version:    1.1.9
+Files:      vendor/flate2-1.1.9/* inside src/rust/vendor.tar.xz
+Authors:    Alex Crichton, Josh Triplett
+License:    MIT OR Apache-2.0
+Repository: https://github.com/rust-lang/flate2-rs
+
+------------------------------
 Name:       itertools
 Version:    0.14.0
 Files:      vendor/itertools-0.14.0/* inside src/rust/vendor.tar.xz
@@ -103,6 +151,30 @@ Files:      vendor/log-0.4.30/* inside src/rust/vendor.tar.xz
 Authors:    The Rust Project Developers
 License:    MIT OR Apache-2.0
 Repository: https://github.com/rust-lang/log
+
+------------------------------
+Name:       memchr
+Version:    2.8.1
+Files:      vendor/memchr-2.8.1/* inside src/rust/vendor.tar.xz
+Authors:    Andrew Gallant, bluss
+License:    Unlicense OR MIT
+Repository: https://github.com/BurntSushi/memchr
+
+------------------------------
+Name:       miniz_oxide
+Version:    0.8.9
+Files:      vendor/miniz_oxide-0.8.9/* inside src/rust/vendor.tar.xz
+Authors:    Frommi, oyvindln, Rich Geldreich richgel99@gmail.com
+License:    MIT OR Zlib OR Apache-2.0
+Repository: https://github.com/Frommi/miniz_oxide/tree/master/miniz_oxide
+
+------------------------------
+Name:       needletail
+Version:    0.6.3
+Files:      vendor/needletail-0.6.3/* inside src/rust/vendor.tar.xz
+Authors:    Roderick Bovee, Vincent Prouillet
+License:    MIT
+Repository: https://github.com/onecodex/needletail
 
 ------------------------------
 Name:       pa-types
@@ -199,6 +271,14 @@ Files:      vendor/serde_derive-1.0.228/* inside src/rust/vendor.tar.xz
 Authors:    Erick Tryzelaar, David Tolnay
 License:    MIT OR Apache-2.0
 Repository: https://github.com/serde-rs/serde
+
+------------------------------
+Name:       simd-adler32
+Version:    0.3.9
+Files:      vendor/simd-adler32-0.3.9/* inside src/rust/vendor.tar.xz
+Authors:    Marvin Countryman
+License:    MIT
+Repository: https://github.com/mcountryman/simd-adler32
 
 ------------------------------
 Name:       syn

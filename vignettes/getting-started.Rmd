@@ -45,7 +45,7 @@ sassy_searcher_search(searcher, list("ATCGATCG"), list("GGGGATCGATCGTTTT"), k = 
 
 List inputs search every pattern against every text. Each list element may be a
 raw vector or a non-missing character scalar, so callers can mix byte strings,
-regular strings, and ALTREP-backed string elements. `pattern_idx` and `text_idx`
+regular strings, and ALTREP-backed raw elements. `pattern_idx` and `text_idx`
 identify the input indices.
 
 ```{r}
@@ -58,3 +58,21 @@ sassy_search(
   strategy = "encoded_patterns"
 )
 ```
+
+## FASTA/FASTQ batches
+
+`sassy_fastx_iter()` and `sassy_fastx_next()` parse FASTA/FASTQ files into
+record-count-bounded batches. Record IDs are exposed as an ALTREP character
+vector and sequences as a list of raw ALTREP slices over immutable native batch
+buffers.
+
+```{r}
+fq <- tempfile(fileext = ".fastq")
+writeLines(c("@r1", "ACGT", "+", "!!!!"), fq, useBytes = TRUE)
+it <- sassy_fastx_iter(fq, batch_records = 1)
+batch <- sassy_fastx_next(it)
+sassy_search(list("ACG"), batch$seq, k = 0, alphabet = "dna", rc = FALSE, text_id = batch$id)
+```
+
+See `vignette("fastx-iteration", package = "Rsassy")` for the performance and
+validation details.

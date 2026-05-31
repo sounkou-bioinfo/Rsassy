@@ -353,6 +353,89 @@ expect_equal(raw_list_matches$pattern_idx, c(0L, 1L, 0L))
 expect_equal(raw_list_matches$text_idx, c(0L, 1L, 1L))
 expect_equal(raw_list_matches$text_start, c(4, 0, 3))
 
+fastx_dir <- tempfile("rsassy-fastx-")
+dir.create(fastx_dir)
+fastq_path <- file.path(fastx_dir, "reads.fastq")
+writeLines(c(
+  "@r1",
+  "ACGT",
+  "+",
+  "!!!!",
+  "@r2 description",
+  "TTTT",
+  "+",
+  "####",
+  "@r3",
+  "GGGGACG",
+  "+",
+  "IIIIIII"
+), fastq_path, useBytes = TRUE)
+fastx_iter <- sassy_fastx_iter(fastq_path, batch_records = 2L)
+fastx_batch <- sassy_fastx_next(fastx_iter)
+expect_equal(class(fastx_batch), "sassy_fastx_batch")
+expect_equal(length(fastx_batch$id), 2L)
+expect_equal(as.character(fastx_batch$id), c("r1", "r2 description"))
+expect_equal(length(fastx_batch$seq), 2L)
+expect_equal(length(fastx_batch$seq[[1L]]), 4L)
+expect_equal(rawToChar(fastx_batch$seq[[1L]]), "ACGT")
+expect_equal(rawToChar(fastx_batch$seq[[2L]]), "TTTT")
+expect_equal(rawToChar(fastx_batch$qual[[2L]]), "####")
+mut_seq <- fastx_batch$seq[[1L]]
+mut_seq[1L] <- charToRaw("T")
+expect_equal(rawToChar(mut_seq), "TCGT")
+expect_equal(rawToChar(fastx_batch$seq[[1L]]), "ACGT")
+fastx_hits <- sassy_search(list("ACG"), fastx_batch$seq, 0, alphabet = "dna", rc = FALSE, text_id = fastx_batch$id)
+expect_equal(nrow(fastx_hits), 1L)
+expect_equal(fastx_hits$text_id, "r1")
+kept_seq <- fastx_batch$seq[[1L]]
+kept_id <- fastx_batch$id
+rm(fastx_batch)
+invisible(gc())
+expect_equal(rawToChar(kept_seq), "ACGT")
+expect_equal(as.character(kept_id), c("r1", "r2 description"))
+fastx_batch2 <- sassy_fastx_next(fastx_iter)
+expect_equal(length(fastx_batch2$id), 1L)
+expect_equal(as.character(fastx_batch2$id), "r3")
+expect_equal(rawToChar(fastx_batch2$seq[[1L]]), "GGGGACG")
+expect_null(sassy_fastx_next(fastx_iter))
+expect_null(sassy_fastx_next(fastx_iter))
+
+fastx_noqual <- sassy_fastx_next(sassy_fastx_iter(fastq_path, batch_records = 3L, include_qual = FALSE))
+expect_null(fastx_noqual$qual)
+expect_equal(rawToChar(fastx_noqual$seq[[3L]]), "GGGGACG")
+
+fasta_path <- file.path(fastx_dir, "wrapped.fa")
+writeLines(c(
+  ">fa1",
+  "AC",
+  "GT",
+  ">fa2",
+  "TTTT"
+), fasta_path, useBytes = TRUE)
+fasta_batch <- sassy_fastx_next(sassy_fastx_iter(fasta_path, batch_records = 10L))
+expect_equal(as.character(fasta_batch$id), c("fa1", "fa2"))
+expect_equal(rawToChar(fasta_batch$seq[[1L]]), "ACGT")
+expect_null(fasta_batch$qual)
+
+fastq_gz_path <- file.path(fastx_dir, "reads.fastq.gz")
+gz_con <- gzfile(fastq_gz_path, open = "wb")
+writeLines(readLines(fastq_path, warn = FALSE), gz_con, useBytes = TRUE)
+close(gz_con)
+gz_batch <- sassy_fastx_next(sassy_fastx_iter(fastq_gz_path, batch_records = 10L))
+expect_equal(as.character(gz_batch$id), c("r1", "r2 description", "r3"))
+expect_equal(rawToChar(gz_batch$seq[[3L]]), "GGGGACG")
+
+utf8_fastq_path <- file.path(fastx_dir, enc2utf8("réads.fastq"))
+writeLines(c("@réad", "ACG", "+", "!!!"), utf8_fastq_path, useBytes = TRUE)
+utf8_batch <- sassy_fastx_next(sassy_fastx_iter(utf8_fastq_path, batch_records = 1L))
+expect_equal(as.character(utf8_batch$id), enc2utf8("réad"))
+utf8_hits <- sassy_search(list("ACG"), utf8_batch$seq, 0, alphabet = "dna", rc = FALSE, text_id = utf8_batch$id)
+expect_equal(utf8_hits$text_id, enc2utf8("réad"))
+
+expect_error(sassy_fastx_iter(fastq_path, batch_records = 0L))
+expect_error(sassy_fastx_iter(NA_character_, batch_records = 1L))
+expect_error(sassy_fastx_next(sassy_searcher("dna", rc = FALSE)))
+
 features <- sassy_features()
 expect_true(is.list(features))
 expect_equal(class(features)[1], "sassy_features")

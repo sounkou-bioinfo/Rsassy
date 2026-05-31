@@ -11,6 +11,7 @@ articles:
     navbar: ~
     contents:
       - api-and-coordinates
+      - fastx-iteration
   - title: Native Builds
     navbar: ~
     contents:

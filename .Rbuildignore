@@ -16,6 +16,7 @@
 ^Dockerfile.*$
 ^README\.html$
 ^cran-comments\.md$
+^benchmarks$
 ^.*\.Rcheck$
 ^.*\.tar\.gz$
 ^.*\.tgz$
