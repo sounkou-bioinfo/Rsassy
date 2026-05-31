@@ -89,8 +89,7 @@ sassy_searcher_search(searcher, list("ATCGATCG"), list("GGGGATCGATCGTTTT"), k = 
 
 List inputs search every pattern against every text. Each element can be
 a raw vector or a character scalar, which also leaves room for
-ALTREP-backed string vectors to hand over batches as lists. For larger
-batches, use `threads > 1`.
+ALTREP-backed batches as lists. For larger batches, use `threads > 1`.
 
 ``` r
 
@@ -136,6 +135,26 @@ sassy_search(
 #>           0        0          2        6             0           4    0      -    4=         TCGT
 ```
 
+Chunked FASTA/FASTQ iteration is available with
+[`sassy_fastx_iter()`](https://sounkou-bioinfo.github.io/Rsassy/reference/sassy_fastx_iter.md)
+and
+[`sassy_fastx_next()`](https://sounkou-bioinfo.github.io/Rsassy/reference/sassy_fastx_next.md).
+Batches expose record IDs as an ALTREP character vector and sequences as
+a list of raw ALTREP slices over immutable native buffers, so search can
+consume file records without first materializing sequence strings in R.
+
+``` r
+
+fq <- tempfile(fileext = ".fastq")
+writeLines(c("@r1", "ACGT", "+", "!!!!"), fq, useBytes = TRUE)
+it <- sassy_fastx_iter(fq, batch_records = 1)
+batch <- sassy_fastx_next(it)
+sassy_search(list("ACG"), batch$seq, k = 0, alphabet = "dna", rc = FALSE, text_id = batch$id)
+#> <sassy_matches> 1 match
+#> pattern_idx text_idx text_id text_start text_end pattern_start pattern_end cost strand cigar
+#>           0        0      r1          0        3             0           3    0      +    3=
+```
+
 CRISPR guide search is available for in-memory sequences with
 [`sassy_crispr()`](https://sounkou-bioinfo.github.io/Rsassy/reference/sassy_crispr.md).
 Guides include the PAM suffix; by default the PAM must match exactly
@@ -151,10 +170,6 @@ sassy_crispr(list("ACGTNGG"), list("TTTACGTAGGTTT"), k = 0, rc = FALSE)
 For file-oriented colored `grep`, FASTA/FASTQ filtering, and large
 command-line pipelines, use the upstream
 [Sassy](https://github.com/RagnarGrootKoerkamp/sassy) CLI directly.
-
-FASTA/FASTQ file search should use a future record-oriented API rather
-than a raw connection stream, so coordinates and record identifiers can
-follow the upstream Sassy CLI semantics.
 
 Inspect the installed build:
 
@@ -188,6 +203,7 @@ make readme       # regenerate README.md from README.Rmd
 make install      # install the package locally
 make test         # run tinytest tests
 make check        # build and run R CMD check
+make reports      # render committed conformance/performance markdown reports
 make clean        # remove generated build artifacts
 ```
 
@@ -207,6 +223,10 @@ Cargo builds.
   : Format matches in SAM-compatible text direction
 - [`sassy_crispr()`](https://sounkou-bioinfo.github.io/Rsassy/reference/sassy_crispr.md)
   : Search CRISPR guide targets
+- [`sassy_fastx_iter()`](https://sounkou-bioinfo.github.io/Rsassy/reference/sassy_fastx_iter.md)
+  : Create a chunked FASTA/FASTQ iterator
+- [`sassy_fastx_next()`](https://sounkou-bioinfo.github.io/Rsassy/reference/sassy_fastx_next.md)
+  : Get the next FASTA/FASTQ batch
 - [`sassy_features()`](https://sounkou-bioinfo.github.io/Rsassy/reference/sassy_features.md)
   : Report Rsassy build and CPU feature information
 - [`sassy_search()`](https://sounkou-bioinfo.github.io/Rsassy/reference/sassy_search.md)
@@ -229,6 +249,8 @@ Cargo builds.
 
 - [API and
   Coordinates](https://sounkou-bioinfo.github.io/Rsassy/articles/api-and-coordinates.md):
+- [Chunked FASTA/FASTQ
+  Iteration](https://sounkou-bioinfo.github.io/Rsassy/articles/fastx-iteration.md):
 
 ### Native Builds
 

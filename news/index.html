@@ -20,6 +20,7 @@
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles"><li><a class="dropdown-item" href="../articles/getting-started.html">Getting Started with Rsassy</a></li>
     <li><a class="dropdown-item" href="../articles/api-and-coordinates.html">API and Coordinates</a></li>
+    <li><a class="dropdown-item" href="../articles/fastx-iteration.html">Chunked FASTA/FASTQ Iteration</a></li>
     <li><a class="dropdown-item" href="../articles/backend-selection.html">Backend Selection</a></li>
     <li><a class="dropdown-item" href="../articles/source-installation-and-vendoring.html">Development and Vendoring</a></li>
   </ul></li>
@@ -41,7 +42,9 @@
 
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="0.2.1-0.1.0.9000" id="rsassy-021-0109000">Rsassy 0.2.1-0.1.0.9000<a class="anchor" aria-label="anchor" href="#rsassy-021-0109000"></a></h2>
-<ul><li>Added a webR/WebAssembly package check in CI.</li>
+<ul><li>Added experimental <code><a href="../reference/sassy_fastx_iter.html">sassy_fastx_iter()</a></code> / <code><a href="../reference/sassy_fastx_next.html">sassy_fastx_next()</a></code> chunked FASTA/FASTQ iteration backed by vendored <code>needletail</code>, with ALTREP character record IDs and raw ALTREP sequence/quality slices over immutable native batch buffers.</li>
+<li>Added committed R Markdown/Markdown conformance and performance reports under <code>benchmarks/</code>, with upstream <code>sassy</code> CLI baselines and threaded Rsassy runs.</li>
+<li>Added a webR/WebAssembly package check in CI.</li>
 <li>Built webR packages with static Rust FFI symbols and <code>wasm_simd128</code>.</li>
 <li>Added native package-level SIMD backends:
 <ul><li>x86_64: scalar, AVX2, AVX-512.</li>

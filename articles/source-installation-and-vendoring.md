@@ -1,11 +1,17 @@
 # Development and Vendoring
 
 Rsassy builds a small Rust crate during package installation. That crate
-depends on `sassy` from crates.io.
+depends on `sassy` for approximate matching and `needletail` for chunked
+FASTA/FASTQ iteration.
 
 ``` toml
 sassy = { version = "0.2.1", default-features = false }
+needletail = { version = "0.6.3", default-features = false, features = ["flate2"] }
 ```
+
+Only needletail’s gzip path is enabled by default; bzip2, xz, and zstd
+support are intentionally not enabled unless the package chooses to
+expand compression support later.
 
 ## Vendoring
 
@@ -34,6 +40,7 @@ make readme   # regenerate README.md
 make install  # local install
 make test     # tinytest
 make check    # R CMD build + R CMD check
+make reports  # render committed benchmark/conformance markdown reports
 make clean    # remove build artifacts
 ```
 

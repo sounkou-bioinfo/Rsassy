@@ -3,6 +3,7 @@
 <url><loc>https://sounkou-bioinfo.github.io/Rsassy/LICENCE.html</loc></url>
 <url><loc>https://sounkou-bioinfo.github.io/Rsassy/articles/api-and-coordinates.html</loc></url>
 <url><loc>https://sounkou-bioinfo.github.io/Rsassy/articles/backend-selection.html</loc></url>
+<url><loc>https://sounkou-bioinfo.github.io/Rsassy/articles/fastx-iteration.html</loc></url>
 <url><loc>https://sounkou-bioinfo.github.io/Rsassy/articles/getting-started.html</loc></url>
 <url><loc>https://sounkou-bioinfo.github.io/Rsassy/articles/index.html</loc></url>
 <url><loc>https://sounkou-bioinfo.github.io/Rsassy/articles/source-installation-and-vendoring.html</loc></url>
@@ -14,6 +15,8 @@
 <url><loc>https://sounkou-bioinfo.github.io/Rsassy/reference/print.sassy_matches.html</loc></url>
 <url><loc>https://sounkou-bioinfo.github.io/Rsassy/reference/sassy_as_sam.html</loc></url>
 <url><loc>https://sounkou-bioinfo.github.io/Rsassy/reference/sassy_crispr.html</loc></url>
+<url><loc>https://sounkou-bioinfo.github.io/Rsassy/reference/sassy_fastx_iter.html</loc></url>
+<url><loc>https://sounkou-bioinfo.github.io/Rsassy/reference/sassy_fastx_next.html</loc></url>
 <url><loc>https://sounkou-bioinfo.github.io/Rsassy/reference/sassy_features.html</loc></url>
 <url><loc>https://sounkou-bioinfo.github.io/Rsassy/reference/sassy_search.html</loc></url>
 <url><loc>https://sounkou-bioinfo.github.io/Rsassy/reference/sassy_searcher.html</loc></url>

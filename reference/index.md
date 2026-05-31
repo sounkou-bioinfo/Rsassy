@@ -10,6 +10,10 @@
   : Format matches in SAM-compatible text direction
 - [`sassy_crispr()`](https://sounkou-bioinfo.github.io/Rsassy/reference/sassy_crispr.md)
   : Search CRISPR guide targets
+- [`sassy_fastx_iter()`](https://sounkou-bioinfo.github.io/Rsassy/reference/sassy_fastx_iter.md)
+  : Create a chunked FASTA/FASTQ iterator
+- [`sassy_fastx_next()`](https://sounkou-bioinfo.github.io/Rsassy/reference/sassy_fastx_next.md)
+  : Get the next FASTA/FASTQ batch
 - [`sassy_features()`](https://sounkou-bioinfo.github.io/Rsassy/reference/sassy_features.md)
   : Report Rsassy build and CPU feature information
 - [`sassy_search()`](https://sounkou-bioinfo.github.io/Rsassy/reference/sassy_search.md)

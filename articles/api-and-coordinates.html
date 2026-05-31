@@ -35,6 +35,7 @@
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
 <li><a class="dropdown-item" href="../articles/getting-started.html">Getting Started with Rsassy</a></li>
     <li><a class="dropdown-item" href="../articles/api-and-coordinates.html">API and Coordinates</a></li>
+    <li><a class="dropdown-item" href="../articles/fastx-iteration.html">Chunked FASTA/FASTQ Iteration</a></li>
     <li><a class="dropdown-item" href="../articles/backend-selection.html">Backend Selection</a></li>
     <li><a class="dropdown-item" href="../articles/source-installation-and-vendoring.html">Development and Vendoring</a></li>
   </ul>
@@ -83,6 +84,12 @@
 <li>
 <code><a href="../reference/sassy_set_backend.html">sassy_set_backend()</a></code> selects a backend before first
 use.</li>
+<li>
+<code><a href="../reference/sassy_fastx_iter.html">sassy_fastx_iter()</a></code> opens a chunked FASTA/FASTQ
+iterator.</li>
+<li>
+<code><a href="../reference/sassy_fastx_next.html">sassy_fastx_next()</a></code> returns the next
+record-count-bounded batch.</li>
 </ul>
 </div>
 <div class="section level2">
@@ -113,14 +120,26 @@ vector/list inputs.</li>
 <p><code>pattern</code> and <code>text</code> are lists of sequence
 elements. Each element may be a raw vector or a non-missing character
 scalar. This keeps one raw vector as one sequence of bytes and lets
-callers mix raw bytes, ordinary strings, and ALTREP-backed string
-elements in the same input list.</p>
+callers mix raw bytes, ordinary strings, and ALTREP-backed raw elements
+in the same input list.</p>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/sassy_search.html">sassy_search</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/rawConversion.html" class="external-link">charToRaw</a></span><span class="op">(</span><span class="st">"ACGT"</span><span class="op">)</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/rawConversion.html" class="external-link">charToRaw</a></span><span class="op">(</span><span class="st">"TTACGTAA"</span><span class="op">)</span><span class="op">)</span>, k <span class="op">=</span> <span class="fl">0</span>, alphabet <span class="op">=</span> <span class="st">"dna"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; &lt;sassy_matches&gt; 2 matches</span></span>
 <span><span class="co">#&gt; pattern_idx text_idx text_start text_end pattern_start pattern_end cost strand cigar</span></span>
 <span><span class="co">#&gt;           0        0          2        6             0           4    0      +    4=</span></span>
 <span><span class="co">#&gt;           0        0          2        6             0           4    0      -    4=</span></span></code></pre></div>
+<p>The FASTA/FASTQ iterator returns batches already shaped for this API:
+<code>batch$seq</code> is a list of raw ALTREP sequence elements and
+<code>batch$id</code> is an ALTREP character vector suitable for
+<code>text_id</code>.</p>
+<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">fq</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempfile</a></span><span class="op">(</span>fileext <span class="op">=</span> <span class="st">".fastq"</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/writeLines.html" class="external-link">writeLines</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"@r1"</span>, <span class="st">"ACGT"</span>, <span class="st">"+"</span>, <span class="st">"!!!!"</span><span class="op">)</span>, <span class="va">fq</span>, useBytes <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
+<span><span class="va">batch</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/sassy_fastx_next.html">sassy_fastx_next</a></span><span class="op">(</span><span class="fu"><a href="../reference/sassy_fastx_iter.html">sassy_fastx_iter</a></span><span class="op">(</span><span class="va">fq</span>, batch_records <span class="op">=</span> <span class="fl">1</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="fu"><a href="../reference/sassy_search.html">sassy_search</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="st">"ACG"</span><span class="op">)</span>, <span class="va">batch</span><span class="op">$</span><span class="va">seq</span>, k <span class="op">=</span> <span class="fl">0</span>, alphabet <span class="op">=</span> <span class="st">"dna"</span>, rc <span class="op">=</span> <span class="cn">FALSE</span>, text_id <span class="op">=</span> <span class="va">batch</span><span class="op">$</span><span class="va">id</span><span class="op">)</span></span>
+<span><span class="co">#&gt; &lt;sassy_matches&gt; 1 match</span></span>
+<span><span class="co">#&gt; pattern_idx text_idx text_id text_start text_end pattern_start pattern_end cost strand cigar</span></span>
+<span><span class="co">#&gt;           0        0      r1          0        3             0           3    0      +    3=</span></span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="match-regions">Match regions<a class="anchor" aria-label="anchor" href="#match-regions"></a>
@@ -128,7 +147,7 @@ elements in the same input list.</p>
 <p><code>match_region = TRUE</code> adds the matched text interval.
 Reverse-strand regions are reverse-complemented to match the pattern
 direction.</p>
-<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/sassy_search.html">sassy_search</a></span><span class="op">(</span></span>
 <span>  <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="st">"ATCGATCG"</span><span class="op">)</span>,</span>
 <span>  <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="st">"GGGGATCGATCGTTTT"</span><span class="op">)</span>,</span>

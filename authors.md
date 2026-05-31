@@ -31,8 +31,27 @@ Matcher*. R package version 0.2.1-0.1.0.9000,
 
     The authors of the vendored Rust crates in src/rust/vendor.tar.xz:
 
+    adler2 (version 2.0.1):
+      Jonas Schievink
+      oyvindln
+
+    buffer-redux (version 1.1.0):
+      dignifiedquire
+      Austin Bonander
+
+    bytecount (version 0.6.9):
+      Andre Bogus
+      Joshua Landau
+
     bytemuck (version 1.25.0):
       Lokathor
+
+    cfg-if (version 1.0.4):
+      Alex Crichton
+
+    crc32fast (version 1.5.0):
+      Sam Rijs
+      Alex Crichton
 
     crossbeam-deque (version 0.8.6):
       Not listed in Cargo manifest; see bundled crate license files.
@@ -58,11 +77,28 @@ Matcher*. R package version 0.2.1-0.1.0.9000,
     ensure_simd (version 0.1.0):
       Ragnar Groot Koerkamp
 
+    flate2 (version 1.1.9):
+      Alex Crichton
+      Josh Triplett
+
     itertools (version 0.14.0):
       bluss
 
     log (version 0.4.30):
       The Rust Project Developers
+
+    memchr (version 2.8.1):
+      Andrew Gallant
+      bluss
+
+    miniz_oxide (version 0.8.9):
+      Frommi
+      oyvindln
+      Rich Geldreich richgel99@gmail.com
+
+    needletail (version 0.6.3):
+      Roderick Bovee
+      Vincent Prouillet
 
     pa-types (version 1.4.0):
       Ragnar Groot Koerkamp
@@ -105,6 +141,9 @@ Matcher*. R package version 0.2.1-0.1.0.9000,
     serde_derive (version 1.0.228):
       Erick Tryzelaar
       David Tolnay
+
+    simd-adler32 (version 0.3.9):
+      Marvin Countryman
 
     syn (version 1.0.109):
       David Tolnay

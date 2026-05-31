@@ -35,6 +35,7 @@
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
 <li><a class="dropdown-item" href="../articles/getting-started.html">Getting Started with Rsassy</a></li>
     <li><a class="dropdown-item" href="../articles/api-and-coordinates.html">API and Coordinates</a></li>
+    <li><a class="dropdown-item" href="../articles/fastx-iteration.html">Chunked FASTA/FASTQ Iteration</a></li>
     <li><a class="dropdown-item" href="../articles/backend-selection.html">Backend Selection</a></li>
     <li><a class="dropdown-item" href="../articles/source-installation-and-vendoring.html">Development and Vendoring</a></li>
   </ul>
@@ -69,8 +70,13 @@
     
     
 <p>Rsassy builds a small Rust crate during package installation. That
-crate depends on <code>sassy</code> from crates.io.</p>
-<div class="sourceCode" id="cb1"><pre class="sourceCode toml"><code class="sourceCode toml"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a><span class="dt">sassy</span> <span class="op">=</span> <span class="op">{ </span><span class="dt">version</span><span class="op"> =</span> <span class="st">"0.2.1"</span><span class="op">, </span><span class="dt">default-features</span><span class="op"> =</span> <span class="cn">false</span><span class="op"> }</span></span></code></pre></div>
+crate depends on <code>sassy</code> for approximate matching and
+<code>needletail</code> for chunked FASTA/FASTQ iteration.</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode toml"><code class="sourceCode toml"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a><span class="dt">sassy</span> <span class="op">=</span> <span class="op">{ </span><span class="dt">version</span><span class="op"> =</span> <span class="st">"0.2.1"</span><span class="op">, </span><span class="dt">default-features</span><span class="op"> =</span> <span class="cn">false</span><span class="op"> }</span></span>
+<span id="cb1-2"><a href="#cb1-2" tabindex="-1"></a><span class="dt">needletail</span> <span class="op">=</span> <span class="op">{ </span><span class="dt">version</span><span class="op"> =</span> <span class="st">"0.6.3"</span><span class="op">, </span><span class="dt">default-features</span><span class="op"> =</span> <span class="cn">false</span><span class="op">, </span><span class="dt">features</span><span class="op"> =</span> <span class="op">[</span><span class="st">"flate2"</span><span class="op">] }</span></span></code></pre></div>
+<p>Only needletail’s gzip path is enabled by default; bzip2, xz, and
+zstd support are intentionally not enabled unless the package chooses to
+expand compression support later.</p>
 <div class="section level2">
 <h2 id="vendoring">Vendoring<a class="anchor" aria-label="anchor" href="#vendoring"></a>
 </h2>
@@ -91,7 +97,8 @@ Rust dependency changes:</p>
 <span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a><span class="fu">make</span> install  <span class="co"># local install</span></span>
 <span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a><span class="fu">make</span> test     <span class="co"># tinytest</span></span>
 <span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a><span class="fu">make</span> check    <span class="co"># R CMD build + R CMD check</span></span>
-<span id="cb4-6"><a href="#cb4-6" tabindex="-1"></a><span class="fu">make</span> clean    <span class="co"># remove build artifacts</span></span></code></pre></div>
+<span id="cb4-6"><a href="#cb4-6" tabindex="-1"></a><span class="fu">make</span> reports  <span class="co"># render committed benchmark/conformance markdown reports</span></span>
+<span id="cb4-7"><a href="#cb4-7" tabindex="-1"></a><span class="fu">make</span> clean    <span class="co"># remove build artifacts</span></span></code></pre></div>
 <p><code>make check</code> uses two Cargo jobs by default. For local
 builds:</p>
 <div class="sourceCode" id="cb5"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a><span class="fu">make</span> CARGO_JOBS=10 check</span></code></pre></div>

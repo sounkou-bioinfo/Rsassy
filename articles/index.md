@@ -9,6 +9,8 @@
 
 - [API and
   Coordinates](https://sounkou-bioinfo.github.io/Rsassy/articles/api-and-coordinates.md):
+- [Chunked FASTA/FASTQ
+  Iteration](https://sounkou-bioinfo.github.io/Rsassy/articles/fastx-iteration.md):
 
 ### Native Builds
 

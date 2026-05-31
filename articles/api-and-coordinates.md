@@ -12,6 +12,10 @@
   prints backend/build information.
 - [`sassy_set_backend()`](https://sounkou-bioinfo.github.io/Rsassy/reference/sassy_set_backend.md)
   selects a backend before first use.
+- [`sassy_fastx_iter()`](https://sounkou-bioinfo.github.io/Rsassy/reference/sassy_fastx_iter.md)
+  opens a chunked FASTA/FASTQ iterator.
+- [`sassy_fastx_next()`](https://sounkou-bioinfo.github.io/Rsassy/reference/sassy_fastx_next.md)
+  returns the next record-count-bounded batch.
 
 ## Coordinates
 
@@ -35,7 +39,7 @@ matches[, c("text_start", "text_end", "pattern_start", "pattern_end", "cigar")]
 `pattern` and `text` are lists of sequence elements. Each element may be
 a raw vector or a non-missing character scalar. This keeps one raw
 vector as one sequence of bytes and lets callers mix raw bytes, ordinary
-strings, and ALTREP-backed string elements in the same input list.
+strings, and ALTREP-backed raw elements in the same input list.
 
 ``` r
 
@@ -44,6 +48,21 @@ sassy_search(list(charToRaw("ACGT")), list(charToRaw("TTACGTAA")), k = 0, alphab
 #> pattern_idx text_idx text_start text_end pattern_start pattern_end cost strand cigar
 #>           0        0          2        6             0           4    0      +    4=
 #>           0        0          2        6             0           4    0      -    4=
+```
+
+The FASTA/FASTQ iterator returns batches already shaped for this API:
+`batch$seq` is a list of raw ALTREP sequence elements and `batch$id` is
+an ALTREP character vector suitable for `text_id`.
+
+``` r
+
+fq <- tempfile(fileext = ".fastq")
+writeLines(c("@r1", "ACGT", "+", "!!!!"), fq, useBytes = TRUE)
+batch <- sassy_fastx_next(sassy_fastx_iter(fq, batch_records = 1))
+sassy_search(list("ACG"), batch$seq, k = 0, alphabet = "dna", rc = FALSE, text_id = batch$id)
+#> <sassy_matches> 1 match
+#> pattern_idx text_idx text_id text_start text_end pattern_start pattern_end cost strand cigar
+#>           0        0      r1          0        3             0           3    0      +    3=
 ```
 
 ## Match regions

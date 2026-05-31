@@ -37,6 +37,7 @@
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
 <li><a class="dropdown-item" href="articles/getting-started.html">Getting Started with Rsassy</a></li>
     <li><a class="dropdown-item" href="articles/api-and-coordinates.html">API and Coordinates</a></li>
+    <li><a class="dropdown-item" href="articles/fastx-iteration.html">Chunked FASTA/FASTQ Iteration</a></li>
     <li><a class="dropdown-item" href="articles/backend-selection.html">Backend Selection</a></li>
     <li><a class="dropdown-item" href="articles/source-installation-and-vendoring.html">Development and Vendoring</a></li>
   </ul>
@@ -109,7 +110,7 @@
 <span><span class="co">#&gt;           0        0          2       10             0           8    1      -   7=1X</span></span>
 <span><span class="co">#&gt;           0        0          4       12             0           8    0      +     8=</span></span>
 <span><span class="co">#&gt;           0        0          6       14             0           8    1      - 1=1X6=</span></span></code></pre></div>
-<p>List inputs search every pattern against every text. Each element can be a raw vector or a character scalar, which also leaves room for ALTREP-backed string vectors to hand over batches as lists. For larger batches, use <code>threads &gt; 1</code>.</p>
+<p>List inputs search every pattern against every text. Each element can be a raw vector or a character scalar, which also leaves room for ALTREP-backed batches as lists. For larger batches, use <code>threads &gt; 1</code>.</p>
 <div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="reference/sassy_search.html">sassy_search</a></span><span class="op">(</span></span>
 <span>  <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="st">"ATG"</span>, <span class="st">"TTT"</span><span class="op">)</span>,</span>
@@ -137,15 +138,24 @@
 <span><span class="co">#&gt; &lt;sassy_matches&gt; 1 match</span></span>
 <span><span class="co">#&gt; pattern_idx text_idx text_start text_end pattern_start pattern_end cost strand cigar match_region</span></span>
 <span><span class="co">#&gt;           0        0          2        6             0           4    0      -    4=         TCGT</span></span></code></pre></div>
-<p>CRISPR guide search is available for in-memory sequences with <code><a href="reference/sassy_crispr.html">sassy_crispr()</a></code>. Guides include the PAM suffix; by default the PAM must match exactly under IUPAC matching.</p>
+<p>Chunked FASTA/FASTQ iteration is available with <code><a href="reference/sassy_fastx_iter.html">sassy_fastx_iter()</a></code> and <code><a href="reference/sassy_fastx_next.html">sassy_fastx_next()</a></code>. Batches expose record IDs as an ALTREP character vector and sequences as a list of raw ALTREP slices over immutable native buffers, so search can consume file records without first materializing sequence strings in R.</p>
 <div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">fq</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempfile</a></span><span class="op">(</span>fileext <span class="op">=</span> <span class="st">".fastq"</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/writeLines.html" class="external-link">writeLines</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"@r1"</span>, <span class="st">"ACGT"</span>, <span class="st">"+"</span>, <span class="st">"!!!!"</span><span class="op">)</span>, <span class="va">fq</span>, useBytes <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
+<span><span class="va">it</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/sassy_fastx_iter.html">sassy_fastx_iter</a></span><span class="op">(</span><span class="va">fq</span>, batch_records <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span>
+<span><span class="va">batch</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/sassy_fastx_next.html">sassy_fastx_next</a></span><span class="op">(</span><span class="va">it</span><span class="op">)</span></span>
+<span><span class="fu"><a href="reference/sassy_search.html">sassy_search</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="st">"ACG"</span><span class="op">)</span>, <span class="va">batch</span><span class="op">$</span><span class="va">seq</span>, k <span class="op">=</span> <span class="fl">0</span>, alphabet <span class="op">=</span> <span class="st">"dna"</span>, rc <span class="op">=</span> <span class="cn">FALSE</span>, text_id <span class="op">=</span> <span class="va">batch</span><span class="op">$</span><span class="va">id</span><span class="op">)</span></span>
+<span><span class="co">#&gt; &lt;sassy_matches&gt; 1 match</span></span>
+<span><span class="co">#&gt; pattern_idx text_idx text_id text_start text_end pattern_start pattern_end cost strand cigar</span></span>
+<span><span class="co">#&gt;           0        0      r1          0        3             0           3    0      +    3=</span></span></code></pre></div>
+<p>CRISPR guide search is available for in-memory sequences with <code><a href="reference/sassy_crispr.html">sassy_crispr()</a></code>. Guides include the PAM suffix; by default the PAM must match exactly under IUPAC matching.</p>
+<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="reference/sassy_crispr.html">sassy_crispr</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="st">"ACGTNGG"</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span><span class="st">"TTTACGTAGGTTT"</span><span class="op">)</span>, k <span class="op">=</span> <span class="fl">0</span>, rc <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
 <span><span class="co">#&gt;     guide cost strand start end match_region cigar</span></span>
 <span><span class="co">#&gt; 1 ACGTNGG    0      +     3  10      ACGTAGG    7=</span></span></code></pre></div>
 <p>For file-oriented colored <code>grep</code>, FASTA/FASTQ filtering, and large command-line pipelines, use the upstream <a href="https://github.com/RagnarGrootKoerkamp/sassy" class="external-link">Sassy</a> CLI directly.</p>
-<p>FASTA/FASTQ file search should use a future record-oriented API rather than a raw connection stream, so coordinates and record identifiers can follow the upstream Sassy CLI semantics.</p>
 <p>Inspect the installed build:</p>
-<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="reference/sassy_features.html">sassy_features</a></span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="co">#&gt; &lt;sassy_features&gt;</span></span>
 <span><span class="co">#&gt; dispatch: dynamic</span></span>
@@ -160,13 +170,14 @@
 <h2 id="development">Development<a class="anchor" aria-label="anchor" href="#development"></a>
 </h2>
 <p>Common development commands from the repository root:</p>
-<div class="sourceCode" id="cb9"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb9-1"><a href="#cb9-1" tabindex="-1"></a><span class="fu">make</span> vendor-rust  <span class="co"># refresh src/rust/vendor.tar.xz after Rust dependency changes</span></span>
-<span id="cb9-2"><a href="#cb9-2" tabindex="-1"></a><span class="fu">make</span> rd           <span class="co"># regenerate NAMESPACE and man/*.Rd from R/search.R</span></span>
-<span id="cb9-3"><a href="#cb9-3" tabindex="-1"></a><span class="fu">make</span> readme       <span class="co"># regenerate README.md from README.Rmd</span></span>
-<span id="cb9-4"><a href="#cb9-4" tabindex="-1"></a><span class="fu">make</span> install      <span class="co"># install the package locally</span></span>
-<span id="cb9-5"><a href="#cb9-5" tabindex="-1"></a><span class="fu">make</span> test         <span class="co"># run tinytest tests</span></span>
-<span id="cb9-6"><a href="#cb9-6" tabindex="-1"></a><span class="fu">make</span> check        <span class="co"># build and run R CMD check</span></span>
-<span id="cb9-7"><a href="#cb9-7" tabindex="-1"></a><span class="fu">make</span> clean        <span class="co"># remove generated build artifacts</span></span></code></pre></div>
+<div class="sourceCode" id="cb10"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb10-1"><a href="#cb10-1" tabindex="-1"></a><span class="fu">make</span> vendor-rust  <span class="co"># refresh src/rust/vendor.tar.xz after Rust dependency changes</span></span>
+<span id="cb10-2"><a href="#cb10-2" tabindex="-1"></a><span class="fu">make</span> rd           <span class="co"># regenerate NAMESPACE and man/*.Rd from R/search.R</span></span>
+<span id="cb10-3"><a href="#cb10-3" tabindex="-1"></a><span class="fu">make</span> readme       <span class="co"># regenerate README.md from README.Rmd</span></span>
+<span id="cb10-4"><a href="#cb10-4" tabindex="-1"></a><span class="fu">make</span> install      <span class="co"># install the package locally</span></span>
+<span id="cb10-5"><a href="#cb10-5" tabindex="-1"></a><span class="fu">make</span> test         <span class="co"># run tinytest tests</span></span>
+<span id="cb10-6"><a href="#cb10-6" tabindex="-1"></a><span class="fu">make</span> check        <span class="co"># build and run R CMD check</span></span>
+<span id="cb10-7"><a href="#cb10-7" tabindex="-1"></a><span class="fu">make</span> reports      <span class="co"># render committed conformance/performance markdown reports</span></span>
+<span id="cb10-8"><a href="#cb10-8" tabindex="-1"></a><span class="fu">make</span> clean        <span class="co"># remove generated build artifacts</span></span></code></pre></div>
 <p><code>make check</code> uses a CRAN-safe default of two Cargo build jobs. Use <code>make check-fast</code> or <code>make CARGO_JOBS=10 check</code> for local multithreaded Cargo builds.</p>
 </div>
 </div>
