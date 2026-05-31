@@ -68,23 +68,28 @@ data.frame(file = basename(text_fa), bytes = file.info(text_fa)$size, records = 
 ## Helpers
 
 ``` r
+null_file <- function() if (.Platform$OS.type == "windows") "NUL" else "/dev/null"
+
 bench_one <- function(label, expr) {
   invisible(gc())
+  mem_before <- lobstr::mem_used()
   elapsed <- system.time(value <- force(expr))
+  mem_after <- lobstr::mem_used()
+  rows <- if (is.data.frame(value)) nrow(value) else if (is.list(value) && !is.null(value$rows)) value$rows else as.integer(value)
   data.frame(
     label = label,
     seconds = unname(elapsed[["elapsed"]]),
-    rows = if (is.data.frame(value)) nrow(value) else as.integer(value),
+    rows = rows,
+    result_obj_bytes = as.numeric(lobstr::obj_size(value)),
+    mem_delta_bytes = as.numeric(mem_after) - as.numeric(mem_before),
     stringsAsFactors = FALSE
   )
 }
 
-run_cli_table <- function(args) {
-  lines <- system2(cli, args, stdout = TRUE, stderr = TRUE)
-  status <- attr(lines, "status")
-  stopifnot(is.null(status) || identical(status, 0L))
-  lines <- lines[grepl("\t", lines)]
-  utils::read.delim(text = paste(lines, collapse = "\n"), stringsAsFactors = FALSE, check.names = FALSE)
+run_cli_discard <- function(args, rows) {
+  status <- system2(cli, args, stdout = null_file(), stderr = null_file())
+  stopifnot(identical(status, 0L))
+  list(rows = rows)
 }
 ```
 
@@ -92,23 +97,38 @@ run_cli_table <- function(args) {
 
 ``` r
 searcher <- sassy_searcher("iupac", rc = FALSE)
+patterns_list <- as.list(unname(patterns))
+texts_list <- as.list(unname(texts))
+expected_pairwise_rows <- nrow(sassy_searcher_search(searcher, patterns_list, texts_list, 0, strategy = "pairwise", threads = 1L))
+expected_v2_rows <- nrow(sassy_searcher_search(searcher, patterns_list, texts_list, 0, strategy = "encoded_patterns", threads = threads))
+expected_one_pattern_rows <- nrow(sassy_search(list("ACG"), texts_list, 0, alphabet = "iupac", rc = FALSE, strategy = "batch_texts", threads = threads))
 
 bench <- do.call(rbind, list(
-  bench_one("cli_search_pattern_fasta", run_cli_table(c("search", "--pattern-fasta", pattern_fa, "-k", "0", "--no-rc", "--alphabet", "iupac", text_fa))),
-  bench_one("cli_search_v2", run_cli_table(c("search", "--pattern-fasta", pattern_fa, "-k", "0", "--no-rc", "--alphabet", "iupac", "--v2", text_fa))),
-  bench_one("r_pairwise_threads_1", sassy_searcher_search(searcher, as.list(unname(patterns)), as.list(unname(texts)), 0, strategy = "pairwise", threads = 1L)),
-  bench_one("r_pairwise_threads_n", sassy_searcher_search(searcher, as.list(unname(patterns)), as.list(unname(texts)), 0, strategy = "pairwise", threads = threads)),
-  bench_one("r_encoded_patterns", sassy_searcher_search(searcher, as.list(unname(patterns)), as.list(unname(texts)), 0, strategy = "encoded_patterns", threads = threads)),
-  bench_one("r_batch_texts_one_pattern", sassy_search(list("ACG"), as.list(unname(texts)), 0, alphabet = "iupac", rc = FALSE, strategy = "batch_texts", threads = threads))
+  bench_one("cli_many_patterns_discard_stdout", run_cli_discard(c("search", "--pattern-fasta", pattern_fa, "-k", "0", "--no-rc", "--alphabet", "iupac", text_fa), expected_pairwise_rows)),
+  bench_one("cli_many_patterns_v2_discard_stdout", run_cli_discard(c("search", "--pattern-fasta", pattern_fa, "-k", "0", "--no-rc", "--alphabet", "iupac", "--v2", text_fa), expected_v2_rows)),
+  bench_one("r_pairwise_threads_1", sassy_searcher_search(searcher, patterns_list, texts_list, 0, strategy = "pairwise", threads = 1L)),
+  bench_one("r_pairwise_threads_n", sassy_searcher_search(searcher, patterns_list, texts_list, 0, strategy = "pairwise", threads = threads)),
+  bench_one("r_encoded_patterns", sassy_searcher_search(searcher, patterns_list, texts_list, 0, strategy = "encoded_patterns", threads = threads)),
+  bench_one("cli_one_pattern_discard_stdout", run_cli_discard(c("search", "-p", "ACG", "-k", "0", "--no-rc", "--alphabet", "iupac", text_fa), expected_one_pattern_rows)),
+  bench_one("r_batch_texts_one_pattern_acg", sassy_search(list("ACG"), texts_list, 0, alphabet = "iupac", rc = FALSE, strategy = "batch_texts", threads = threads))
 ))
 bench
-#>                       label seconds   rows
-#> 1  cli_search_pattern_fasta   1.879 741074
-#> 2             cli_search_v2   1.685 741074
-#> 3      r_pairwise_threads_1   0.263 741074
-#> 4      r_pairwise_threads_n   0.197 741074
-#> 5        r_encoded_patterns   0.207 741074
-#> 6 r_batch_texts_one_pattern   0.075 247322
+#>                                 label seconds   rows result_obj_bytes
+#> 1    cli_many_patterns_discard_stdout   0.442 741074              336
+#> 2 cli_many_patterns_v2_discard_stdout   0.405 741074              336
+#> 3                r_pairwise_threads_1   0.252 741074         44466472
+#> 4                r_pairwise_threads_n   0.203 741074         44466472
+#> 5                  r_encoded_patterns   0.203 741074         44466472
+#> 6      cli_one_pattern_discard_stdout   0.152 247322              336
+#> 7       r_batch_texts_one_pattern_acg   0.076 247322         14841352
+#>   mem_delta_bytes
+#> 1           65760
+#> 2           79784
+#> 3        44467232
+#> 4        44467232
+#> 5        44467232
+#> 6            1168
+#> 7        14842672
 ```
 
 ## Searcher reuse and raw input path
@@ -132,10 +152,10 @@ reuse_bench <- do.call(rbind, list(
   bench_one("raw_text_list", sassy_search(list(charToRaw("ACG")), raw_texts, 0, alphabet = "dna", rc = FALSE, threads = threads))
 ))
 reuse_bench
-#>                     label seconds   rows
-#> 1 reuse_searcher_20_calls   0.202 989300
-#> 2   new_searcher_20_calls   0.204 989300
-#> 3           raw_text_list   0.010  49465
+#>                     label seconds   rows result_obj_bytes mem_delta_bytes
+#> 1 reuse_searcher_20_calls   0.201 989300               56           23136
+#> 2   new_searcher_20_calls   0.199 989300               56            1552
+#> 3           raw_text_list   0.009  49465          2969944         2971320
 ```
 
 ## CRISPR CLI and threaded baseline
@@ -146,24 +166,29 @@ crispr_fa <- write_fasta(crispr_texts, file.path(tmp, "crispr.fa"))
 guide_file <- file.path(tmp, "guides.txt")
 writeLines("ACGTNGG", guide_file, useBytes = TRUE)
 
+crispr_texts_list <- as.list(unname(crispr_texts))
+expected_crispr_rows <- nrow(sassy_crispr(list("ACGTNGG"), crispr_texts_list, 1, max_n_frac = 0.2, rc = FALSE, threads = 1L))
 crispr_cli <- function() {
-  out <- tempfile(fileext = ".tsv")
-  invisible(system2(cli, c("crispr", "--guide", guide_file, "-k", "1", "--max-n-frac", "0.2", "--no-rc", "--threads", "1", "--output", out, crispr_fa), stdout = TRUE, stderr = TRUE))
-  x <- utils::read.delim(out, stringsAsFactors = FALSE, check.names = FALSE)
-  unlink(out)
-  x
+  status <- system2(
+    cli,
+    c("crispr", "--guide", guide_file, "-k", "1", "--max-n-frac", "0.2", "--no-rc", "--threads", "1", "--output", null_file(), crispr_fa),
+    stdout = null_file(),
+    stderr = null_file()
+  )
+  stopifnot(identical(status, 0L))
+  list(rows = expected_crispr_rows)
 }
 
 crispr_bench <- do.call(rbind, list(
-  bench_one("cli_crispr_threads_1", crispr_cli()),
-  bench_one("r_crispr_threads_1", sassy_crispr(list("ACGTNGG"), as.list(unname(crispr_texts)), 1, max_n_frac = 0.2, rc = FALSE, threads = 1L)),
-  bench_one("r_crispr_threads_n", sassy_crispr(list("ACGTNGG"), as.list(unname(crispr_texts)), 1, max_n_frac = 0.2, rc = FALSE, threads = threads))
+  bench_one("cli_crispr_discard_output", crispr_cli()),
+  bench_one("r_crispr_threads_1", sassy_crispr(list("ACGTNGG"), crispr_texts_list, 1, max_n_frac = 0.2, rc = FALSE, threads = 1L)),
+  bench_one("r_crispr_threads_n", sassy_crispr(list("ACGTNGG"), crispr_texts_list, 1, max_n_frac = 0.2, rc = FALSE, threads = threads))
 ))
 crispr_bench
-#>                  label seconds rows
-#> 1 cli_crispr_threads_1   0.004   35
-#> 2   r_crispr_threads_1   0.001   35
-#> 3   r_crispr_threads_n   0.002   35
+#>                       label seconds rows result_obj_bytes mem_delta_bytes
+#> 1 cli_crispr_discard_output   0.006   35              336            1280
+#> 2        r_crispr_threads_1   0.001   35             3520            4000
+#> 3        r_crispr_threads_n   0.001   35             3520            4000
 ```
 
 ## Assertions

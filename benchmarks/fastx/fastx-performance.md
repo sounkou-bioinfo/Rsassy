@@ -92,17 +92,21 @@ files
 #> 3         wrapped.fa  8038894
 data.frame(step = "generate", seconds = unname(elapsed_generate[["elapsed"]]))
 #>       step seconds
-#> 1 generate   1.605
+#> 1 generate   1.593
 ```
 
 ## Benchmark helpers
 
 ``` r
+null_file <- function() if (.Platform$OS.type == "windows") "NUL" else "/dev/null"
+
 bench_one <- function(label, expr) {
   invisible(gc())
-  before <- gc()[, "used"]
+  gc_before <- gc()[, "used"]
+  mem_before <- lobstr::mem_used()
   elapsed <- system.time(value <- force(expr))
-  after <- gc()[, "used"]
+  mem_after <- lobstr::mem_used()
+  gc_after <- gc()[, "used"]
   data.frame(
     label = label,
     seconds = unname(elapsed[["elapsed"]]),
@@ -110,8 +114,11 @@ bench_one <- function(label, expr) {
     seq_bytes = value$seq_bytes,
     qual_bytes = value$qual_bytes,
     checksum = value$checksum,
-    gc_ncell_delta = unname(after[["Ncells"]] - before[["Ncells"]]),
-    gc_vcell_delta = unname(after[["Vcells"]] - before[["Vcells"]]),
+    aux_obj_bytes = if (is.null(value$aux_obj_bytes)) NA_real_ else value$aux_obj_bytes,
+    result_obj_bytes = as.numeric(lobstr::obj_size(value)),
+    mem_delta_bytes = as.numeric(mem_after) - as.numeric(mem_before),
+    gc_ncell_delta = unname(gc_after[["Ncells"]] - gc_before[["Ncells"]]),
+    gc_vcell_delta = unname(gc_after[["Vcells"]] - gc_before[["Vcells"]]),
     stringsAsFactors = FALSE
   )
 }
@@ -123,11 +130,13 @@ iterate_fastx <- function(path, include_qual = TRUE, touch = c("none", "first", 
   seq_bytes <- 0
   qual_bytes <- 0
   checksum <- 0
+  max_batch_obj_bytes <- 0
   repeat {
     batch <- sassy_fastx_next(it)
     if (is.null(batch)) break
     n <- length(batch$seq)
     records <- records + n
+    max_batch_obj_bytes <- max(max_batch_obj_bytes, as.numeric(lobstr::obj_size(batch)))
     if (touch == "none") {
       seq_bytes <- seq_bytes + sum(vapply(seq_len(n), function(i) length(batch$seq[[i]]), integer(1)))
       if (!is.null(batch$qual)) {
@@ -155,16 +164,30 @@ iterate_fastx <- function(path, include_qual = TRUE, touch = c("none", "first", 
       }
     }
   }
-  list(records = records, seq_bytes = seq_bytes, qual_bytes = qual_bytes, checksum = checksum)
+  list(
+    records = records,
+    seq_bytes = seq_bytes,
+    qual_bytes = qual_bytes,
+    checksum = checksum,
+    aux_obj_bytes = max_batch_obj_bytes
+  )
 }
 
-cli_search_file <- function(path) {
-  lines <- system2(cli, c("search", "-p", "ACG", "-k", "0", "--alphabet", "dna", "--no-rc", path), stdout = TRUE, stderr = TRUE)
-  status <- attr(lines, "status")
-  stopifnot(is.null(status) || identical(status, 0L))
-  table_lines <- lines[grepl("\t", lines)]
-  hits <- utils::read.delim(text = paste(table_lines, collapse = "\n"), stringsAsFactors = FALSE, check.names = FALSE)
-  list(records = n_records, seq_bytes = NA_real_, qual_bytes = NA_real_, checksum = nrow(hits))
+cli_search_file <- function(path, expected_hits) {
+  status <- system2(
+    cli,
+    c("search", "-p", "ACG", "-k", "0", "--alphabet", "dna", "--no-rc", path),
+    stdout = null_file(),
+    stderr = null_file()
+  )
+  stopifnot(identical(status, 0L))
+  list(
+    records = n_records,
+    seq_bytes = n_records * read_len,
+    qual_bytes = n_records * read_len,
+    checksum = expected_hits,
+    aux_obj_bytes = 0
+  )
 }
 
 readlines_fastq <- function(path) {
@@ -176,7 +199,8 @@ readlines_fastq <- function(path) {
     seq_bytes = sum(nchar(seq, type = "bytes")),
     qual_bytes = sum(nchar(qual, type = "bytes")),
     checksum = sum(as.integer(charToRaw(paste0(substr(seq, 1L, 1L), collapse = "")))) +
-      sum(as.integer(charToRaw(paste0(substr(qual, 1L, 1L), collapse = ""))))
+      sum(as.integer(charToRaw(paste0(substr(qual, 1L, 1L), collapse = "")))),
+    aux_obj_bytes = as.numeric(lobstr::obj_size(lines, seq, qual))
   )
 }
 ```
@@ -194,19 +218,26 @@ bench <- do.call(rbind, list(
 ))
 bench
 #>                               label seconds records seq_bytes qual_bytes
-#> 1      fastq_altrep_no_qual_lengths   0.073   50000   7500000          0
-#> 2    fastq_altrep_with_qual_lengths   0.113   50000   7500000    7500000
-#> 3            fastq_altrep_touch_all   0.139   50000   7500000    7500000
-#> 4 fastq_gz_altrep_with_qual_lengths   0.116   50000   7500000    7500000
-#> 5      wrapped_fasta_altrep_lengths   0.066   50000   7500000          0
-#> 6              base_readLines_fastq   0.086   50000   7500000    7500000
-#>   checksum gc_ncell_delta gc_vcell_delta
-#> 1        0            639           2414
-#> 2        0             25             43
-#> 3  7237500             25             43
-#> 4        0             25             43
-#> 5        0             25             43
-#> 6  7237500           1127           2997
+#> 1      fastq_altrep_no_qual_lengths   0.072   50000   7500000          0
+#> 2    fastq_altrep_with_qual_lengths   0.112   50000   7500000    7500000
+#> 3            fastq_altrep_touch_all   0.133   50000   7500000    7500000
+#> 4 fastq_gz_altrep_with_qual_lengths   0.111   50000   7500000    7500000
+#> 5      wrapped_fasta_altrep_lengths   0.063   50000   7500000          0
+#> 6              base_readLines_fastq   0.102   50000   7500000    7500000
+#>   checksum aux_obj_bytes result_obj_bytes mem_delta_bytes gc_ncell_delta
+#> 1        0          1976              896           65608            834
+#> 2        0          2104              896            1792             24
+#> 3  7237500          2104              896            1792             24
+#> 4        0          2104              896            1792             24
+#> 5        0          1976              896            1792             24
+#> 6  7237500       5201200              896           88768           1148
+#>   gc_vcell_delta
+#> 1           2877
+#> 2             43
+#> 3             43
+#> 4             43
+#> 5             43
+#> 6           3088
 ```
 
 ## Search-through-batches smoke check
@@ -215,31 +246,47 @@ bench
 search_batches <- function(path) {
   it <- sassy_fastx_iter(path, batch_records = batch_records, include_qual = FALSE)
   records <- 0L
+  seq_bytes <- 0
   hits <- 0L
+  max_batch_obj_bytes <- 0
   repeat {
     batch <- sassy_fastx_next(it)
     if (is.null(batch)) break
-    records <- records + length(batch$seq)
+    n <- length(batch$seq)
+    records <- records + n
+    seq_bytes <- seq_bytes + sum(vapply(seq_len(n), function(i) length(batch$seq[[i]]), integer(1)))
+    max_batch_obj_bytes <- max(max_batch_obj_bytes, as.numeric(lobstr::obj_size(batch)))
     out <- sassy_search(list("ACG"), batch$seq, k = 0, alphabet = "dna", rc = FALSE, text_id = batch$id)
     hits <- hits + nrow(out)
   }
-  list(records = records, seq_bytes = NA_real_, qual_bytes = 0, checksum = hits)
+  list(
+    records = records,
+    seq_bytes = seq_bytes,
+    qual_bytes = 0,
+    checksum = hits,
+    aux_obj_bytes = max_batch_obj_bytes
+  )
 }
 
+expected_hits <- search_batches(fastq_path)$checksum
 search_bench <- do.call(rbind, list(
   bench_one("search_acg_over_fastq_batches", search_batches(fastq_path)),
-  bench_one("cli_search_acg_fastq", cli_search_file(fastq_path)),
-  bench_one("cli_search_acg_fastq_gz", cli_search_file(fastq_gz_path))
+  bench_one("cli_search_acg_fastq_discard_stdout", cli_search_file(fastq_path, expected_hits)),
+  bench_one("cli_search_acg_fastq_gz_discard_stdout", cli_search_file(fastq_gz_path, expected_hits))
 ))
 search_bench
-#>                           label seconds records seq_bytes qual_bytes checksum
-#> 1 search_acg_over_fastq_batches   0.805   50000        NA          0  1850000
-#> 2          cli_search_acg_fastq   4.828   50000        NA         NA  1850000
-#> 3       cli_search_acg_fastq_gz   4.352   50000        NA         NA  1850000
-#>   gc_ncell_delta gc_vcell_delta
-#> 1            555           1485
-#> 2            447         984296
-#> 3             17             34
+#>                                    label seconds records seq_bytes qual_bytes
+#> 1          search_acg_over_fastq_batches   0.844   50000   7500000          0
+#> 2    cli_search_acg_fastq_discard_stdout   0.734   50000   7500000    7500000
+#> 3 cli_search_acg_fastq_gz_discard_stdout   0.731   50000   7500000    7500000
+#>   checksum aux_obj_bytes result_obj_bytes mem_delta_bytes gc_ncell_delta
+#> 1  1850000          1976              896            2288             23
+#> 2  1850000             0              896            2200             34
+#> 3  1850000             0              896            5376             61
+#>   gc_vcell_delta
+#> 1             42
+#> 2             91
+#> 3            299
 ```
 
 ## Assertions
@@ -248,6 +295,7 @@ search_bench
 stopifnot(all(bench$records == n_records))
 stopifnot(all(search_bench$records == n_records))
 stopifnot(all(search_bench$checksum > 0))
+stopifnot(!any(is.na(search_bench$seq_bytes)))
 stopifnot(bench$seq_bytes[bench$label == "fastq_altrep_no_qual_lengths"] == n_records * read_len)
 stopifnot(bench$qual_bytes[bench$label == "fastq_altrep_no_qual_lengths"] == 0)
 stopifnot(bench$qual_bytes[bench$label == "fastq_altrep_with_qual_lengths"] == n_records * read_len)
